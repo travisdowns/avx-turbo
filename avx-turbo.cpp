@@ -174,7 +174,7 @@ int main(int argc, char** argv) {
     ISA isas_supported = get_isas();
     printf("CPU supports AVX2   : [%s]\n", isas_supported & AVX2   ? "YES" : "NO ");
     printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
-    printf("tsc_freq = %6.3f MHz (%s)\n", 1000.0 / RdtscClock::to_nanos(1000000), get_tsc_cal_info(arg_force_tsc_cal));
+    printf("tsc_freq = %.1f MHz (%s)\n", 1000000000.0 / RdtscClock::to_nanos(1000000), get_tsc_cal_info(arg_force_tsc_cal));
     auto first = ALL_FUNCS[0].func;
     run_test<RdtscClock>(first, 1000000); // warmup
 
