@@ -7,6 +7,8 @@
 #include "table.hpp"
 #include "cpu.h"
 
+#include "args.hxx"
+
 #include <cstdlib>
 #include <cinttypes>
 #include <array>
@@ -66,6 +68,14 @@ void pin_to_cpu(int cpu) {
     }
 }
 
+/** args */
+args::ArgumentParser parser{"avx-turbo: Determine AVX2 and AVX-512 downclocking behavior"};
+args::HelpFlag help{parser, "help", "Display this help menu", {'h', "help"}};
+args::Flag arg_force_tsc_cal{parser, "force-tsc-calibrate",
+    "Force manual TSC calibration loop, even if cpuid TSC Hz is available", {"force-tsc-calibrate"}};
+//args::ValueFlag<std::string> arg_timer{parser, "TIMER-NAME", "Use the specified timer", {"timer"}};
+
+
 template <typename CHRONO_CLOCK>
 struct StdClock {
     using now_t   = decltype(CHRONO_CLOCK::now());
@@ -94,16 +104,11 @@ struct RdtscClock {
 
     /* accept the result of subtraction of durations and convert to nanos */
     static uint64_t to_nanos(now_t diff) {
-        return diff * TSC_TO_NANOS;
+        static double tsc_to_nanos = 1000000000.0 / get_tsc_freq(arg_force_tsc_cal);
+        return diff * tsc_to_nanos;
     }
 
-    static const uint64_t TSC_FREQ;
-    static const double TSC_TO_NANOS;
 };
-
-const uint64_t RdtscClock::TSC_FREQ     = get_tsc_freq();
-const double   RdtscClock::TSC_TO_NANOS = 1000000000.0 / RdtscClock::TSC_FREQ;
-
 
 /*
  * Calculate the frequency of the CPU based on timing a tight loop that we expect to
@@ -145,12 +150,22 @@ ISA get_isas() {
     return (ISA)ret;
 }
 
+
+
 int main(int argc, char** argv) {
+
+    try {
+        parser.ParseCLI(argc, argv);
+    } catch (args::Help& help) {
+        printf("%s\n", parser.Help().c_str());
+        exit(EXIT_SUCCESS);
+    }
+
     pin_to_cpu(0);
     ISA isas_supported = get_isas();
     printf("CPU supports AVX2   : [%s]\n", isas_supported & AVX2   ? "YES" : "NO ");
     printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
-    printf("tsc_freq = %6.3f GHz\n", RdtscClock::TSC_FREQ / 1000000000.0);
+    printf("tsc_freq = %6.3f GHz (%s)\n", 1000000.0 / RdtscClock::to_nanos(1000000), get_tsc_cal_info(arg_force_tsc_cal));
     auto first = ALL_FUNCS[0].func;
     CalcCpuFreq<RdtscClock, 1000000>(first); // warmup
 
@@ -164,7 +179,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    printf("==================\n%s================", table.str().c_str());
+    printf("==================\n%s================\n", table.str().c_str());
 
 //
 //    for (int i = 0; i < 2; i++) {

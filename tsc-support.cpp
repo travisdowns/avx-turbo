@@ -8,6 +8,8 @@
 #include <string>
 #include <cstdio>
 #include <cassert>
+#include <array>
+#include <algorithm>
 
 #include <error.h>
 
@@ -65,13 +67,7 @@ family_model get_family_model() {
     return ret;
 }
 
-/**
- * TSC frequency detection is described in
- * Intel SDM Vol3 18.7.3: Determining the Processor Base Frequency
- *
- * Nominal TSC frequency = ( CPUID.15H.ECX[31:0] * CPUID.15H.EBX[31:0] ) ÷ CPUID.15H.EAX[31:0]
- */
-uint64_t get_tsc_freq() {
+uint64_t get_tsc_from_cpuid() {
     auto cpuid15 = cpuid(0x15);
     std::printf("cpuid = %s\n", cpuid15.to_string().c_str());
 
@@ -92,9 +88,74 @@ uint64_t get_tsc_freq() {
         return (int64_t)24000000 * cpuid15.ebx / cpuid15.eax; // 24 MHz crystal clock
     }
 
-    error(EXIT_FAILURE, 0, "unsupported cpu: family 6, model %d", family.model);
-    __builtin_unreachable();
     return 0;
+}
+
+
+namespace Clock {
+    static inline uint64_t nanos() {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return (uint64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
+    }
+}
+
+constexpr size_t SAMPLES = 101;
+constexpr uint64_t DELAY_NANOS = 10000; // nanos 1us
+
+uint64_t do_sample() {
+    _mm_lfence();
+    uint64_t  nsbefore = Clock::nanos();
+    uint64_t tscbefore = rdtsc();
+    while (nsbefore + DELAY_NANOS > Clock::nanos())
+        ;
+    uint64_t  nsafter = Clock::nanos();
+    uint64_t tscafter = rdtsc();
+    return (tscafter - tscbefore) * 1000000000u / (nsafter - nsbefore);
+}
+
+uint64_t tsc_from_cal() {
+    std::array<uint64_t, SAMPLES * 2> samples;
+
+    for (size_t s = 0; s < SAMPLES * 2; s++) {
+        samples[s] = do_sample();
+    }
+
+    // throw out the first half of samples as a warmup
+    std::array<uint64_t, SAMPLES> second_half;
+    std::copy(samples.begin() + SAMPLES, samples.end(), second_half.begin());
+    std::sort(second_half.begin(), second_half.end());
+
+    // average the middle quintile
+    auto third_quintile = second_half.begin() + 2 * SAMPLES/5;
+    uint64_t sum = std::accumulate(third_quintile, third_quintile + SAMPLES/5, (uint64_t)0);
+
+    return sum / (SAMPLES/5);
+}
+
+/**
+ * TSC frequency detection is described in
+ * Intel SDM Vol3 18.7.3: Determining the Processor Base Frequency
+ *
+ * Nominal TSC frequency = ( CPUID.15H.ECX[31:0] * CPUID.15H.EBX[31:0] ) ÷ CPUID.15H.EAX[31:0]
+ */
+uint64_t get_tsc_freq(bool force_calibrate) {
+    uint64_t tsc;
+    if (!force_calibrate && (tsc = get_tsc_from_cpuid())) {
+        return tsc;
+    }
+
+    return tsc_from_cal();
+}
+
+
+const char* get_tsc_cal_info(bool force_calibrate) {
+    if (!force_calibrate && get_tsc_from_cpuid()) {
+        return "from cpuid leaf 0x15";
+    } else {
+        return "from calibration loop";
+    }
+
 }
 
 
