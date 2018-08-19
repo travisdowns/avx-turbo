@@ -28,8 +28,8 @@ ret
 %endmacro
 
 test_func scalar_iadd, {xor eax, eax}, {add rax, rax}
-test_func avx128_iadd,  {vpxor xmm0, xmm0, xmm0}, {vpaddq xmm0, xmm0, xmm0}
-test_func avx256_iadd,  {vpxor xmm0, xmm0, xmm0}, {vpaddq ymm0, ymm0, ymm0}
-test_func avx512_iadd,  {vpxor xmm0, xmm0, xmm0}, {vpaddq zmm0, zmm0, zmm0}
+test_func avx128_iadd,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq xmm0, xmm0, xmm0}
+test_func avx256_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq ymm0, ymm0, ymm0}
+test_func avx512_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq zmm0, zmm0, zmm0}
 
 

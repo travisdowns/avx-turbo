@@ -34,7 +34,8 @@ enum ISA {
 struct test_func {
     // function pointer to the test function
     cal_f* func;
-    const char* name;
+    const char* id;
+    const char* description;
     ISA isa;
 };
 
@@ -54,7 +55,7 @@ FUNCS_X(DECLARE)
 
 }
 
-#define MAKE_STRUCT(f, n, i) { f, n, i },
+#define MAKE_STRUCT(f, d, i) { f, #f, d, i },
 const test_func ALL_FUNCS[] = {
 FUNCS_X(MAKE_STRUCT)
 };
@@ -73,7 +74,8 @@ args::ArgumentParser parser{"avx-turbo: Determine AVX2 and AVX-512 downclocking 
 args::HelpFlag help{parser, "help", "Display this help menu", {'h', "help"}};
 args::Flag arg_force_tsc_cal{parser, "force-tsc-calibrate",
     "Force manual TSC calibration loop, even if cpuid TSC Hz is available", {"force-tsc-calibrate"}};
-//args::ValueFlag<std::string> arg_timer{parser, "TIMER-NAME", "Use the specified timer", {"timer"}};
+args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
+args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
 
 
 template <typename CHRONO_CLOCK>
@@ -118,18 +120,18 @@ struct RdtscClock {
  * run twice, once with ITERS iterations and once with 2*ITERS, and a delta is used to
  * remove measurement overhead.
  */
-template <typename CLOCK, size_t ITERS = 100000, size_t TRIES = 101, size_t WARMUP = 3>
-double CalcCpuFreq(cal_f* func) {
-    assert(ITERS % 100 == 0);
+template <typename CLOCK, size_t TRIES = 101, size_t WARMUP = 3>
+double run_test(cal_f* func, size_t iters) {
+    assert(iters % 100 == 0);
 
     std::array<typename CLOCK::delta_t, TRIES> results;
 
     for (size_t w = 0; w < WARMUP + 1; w++) {
         for (size_t r = 0; r < TRIES; r++) {
             auto t0 = CLOCK::now();
-            func(ITERS);
+            func(iters);
             auto t1 = CLOCK::now();
-            func(ITERS * 2);
+            func(iters * 2);
             auto t2 = CLOCK::now();
             results[r] = (t2 - t1) - (t1 - t0);
         }
@@ -139,7 +141,7 @@ double CalcCpuFreq(cal_f* func) {
     std::transform(results.begin(), results.end(), nanos.begin(), CLOCK::to_nanos);
     DescriptiveStats stats = get_stats(nanos.begin(), nanos.end());
 
-    double ghz = ((double)ITERS / stats.getMedian());
+    double ghz = ((double)iters / stats.getMedian());
     return ghz;
 }
 
@@ -150,12 +152,19 @@ ISA get_isas() {
     return (ISA)ret;
 }
 
-
+bool should_run(const test_func& t, ISA isas_supported) {
+    return (t.isa & isas_supported)
+            && (!arg_focus || arg_focus.Get() == t.id);
+}
 
 int main(int argc, char** argv) {
 
     try {
         parser.ParseCLI(argc, argv);
+        if (arg_iters.Get() % 100 != 0) {
+            printf("ITERS must be a multiple of 100\n");
+            exit(EXIT_FAILURE);
+        }
     } catch (args::Help& help) {
         printf("%s\n", parser.Help().c_str());
         exit(EXIT_SUCCESS);
@@ -165,17 +174,20 @@ int main(int argc, char** argv) {
     ISA isas_supported = get_isas();
     printf("CPU supports AVX2   : [%s]\n", isas_supported & AVX2   ? "YES" : "NO ");
     printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
-    printf("tsc_freq = %6.3f GHz (%s)\n", 1000000.0 / RdtscClock::to_nanos(1000000), get_tsc_cal_info(arg_force_tsc_cal));
+    printf("tsc_freq = %6.3f MHz (%s)\n", 1000.0 / RdtscClock::to_nanos(1000000), get_tsc_cal_info(arg_force_tsc_cal));
     auto first = ALL_FUNCS[0].func;
-    CalcCpuFreq<RdtscClock, 1000000>(first); // warmup
+    run_test<RdtscClock>(first, 1000000); // warmup
 
 
     table::Table table;
-    table.colInfo(1).justify = table::ColInfo::RIGHT;
-    table.newRow().add("Loop Type").add("GHz");
+    table.colInfo(2).justify = table::ColInfo::RIGHT;
+    table.newRow().add("ID").add("Description").add("MHz");
     for (const auto& test : ALL_FUNCS) {
-        if (test.isa & isas_supported) {
-            table.newRow().add(test.name).addf("%7.4f", CalcCpuFreq<RdtscClock>(test.func));
+        if (should_run(test, isas_supported)) {
+            table.newRow()
+                    .add(test.id)
+                    .add(test.description)
+                    .addf("%4.0f", run_test<RdtscClock>(test.func, arg_iters.Get()) * 1000);
         }
     }
 
