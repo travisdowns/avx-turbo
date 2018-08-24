@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/travisdowns/avx-turbo.svg?branch=master)](https://travis-ci.org/travisdowns/avx-turbo)
+
 # avx-turbo
 
 Test the non-AVX, AVX2 and AVX-512 speeds across various active core counts
