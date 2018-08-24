@@ -13,6 +13,7 @@
 #include <numeric>
 
 #include <error.h>
+#include <time.h>
 
 using std::uint32_t;
 
