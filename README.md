@@ -31,5 +31,7 @@ for a summary of some options something like this:
       --test=[TEST-ID]                  Run only the specified test (by ID)
       --iters=[ITERS]                   Run the test loop ITERS times (default
                                         100000)
+      --min-threads=[MIN]               The minimum number of threads to use
+      --max-threads=[MAX]               The maximum number of threads to use
 
 ```
