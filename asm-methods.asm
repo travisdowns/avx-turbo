@@ -27,16 +27,18 @@ jnz .top
 ret
 %endmacro
 
-test_func scalar_iadd, {xor eax, eax}, {add rax, rax}
-test_func avx128_iadd,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq  xmm0, xmm0, xmm0}
-test_func avx128_imul,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpmuldq xmm0, xmm0, xmm0}
-test_func avx128_fma ,  {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd xmm0, xmm0, xmm0}
-test_func avx256_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  ymm0, ymm0, ymm0}
-test_func avx256_imul,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq ymm0, ymm0, ymm0}
-test_func avx256_fma ,  {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd ymm0, ymm0, ymm0}
-test_func avx512_iadd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
-test_func avx512_imul,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm0, zmm0}
-test_func avx512_fma ,  {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
+test_func scalar_iadd,    {xor eax, eax}, {add rax, rax}
+test_func avx128_iadd,    {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq  xmm0, xmm0, xmm0}
+test_func avx128_iadd_t,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpaddq  xmm0, xmm1, xmm1}
+test_func avx128_imul,    {vpcmpeqd xmm0, xmm0, xmm0}, {vpmuldq xmm0, xmm0, xmm0}
+test_func avx128_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd xmm0, xmm0, xmm0}
+test_func avx256_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  ymm0, ymm0, ymm0}
+test_func avx256_iadd_t,  {vpcmpeqd ymm1, ymm0, ymm0}, {vpaddq  ymm0, ymm1, ymm1}
+test_func avx256_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq ymm0, ymm0, ymm0}
+test_func avx256_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd ymm0, ymm0, ymm0}
+test_func avx512_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
+test_func avx512_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm0, zmm0}
+test_func avx512_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
 
 ; this is like test_func, but it uses 10 parallel chains of instructions,
 ; unrolled 10 times, so (probably) max throughput
@@ -59,7 +61,6 @@ define_func %1
 %assign r 0
 %rep 10
 %4 %3 %+ r, %3 %+ r, %3 %+ r
-;vfmadd132pd ymm %+ r, ymm0, ymm0
 %assign r (r+1)
 %endrep
 %endrep
@@ -68,6 +69,7 @@ jnz .top
 ret
 %endmacro
 
+test_func_tput avx128_fma_t ,  vmovddup,     xmm, vfmadd132pd, [zero_dp]
 test_func_tput avx256_fma_t ,  vbroadcastsd, ymm, vfmadd132pd, [zero_dp]
 test_func_tput avx512_fma_t ,  vbroadcastsd, zmm, vfmadd132pd, [zero_dp]
 

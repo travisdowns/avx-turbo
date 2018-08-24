@@ -56,13 +56,16 @@ struct test_func {
     x(scalar_iadd,         "Scalar integer adds",       BASE)   \
     x(avx128_mov_sparse,   "128-bit reg-reg mov",       AVX2)   \
     x(avx128_merge_sparse, "128-bit reg-reg merge mov", AVX512) \
-    x(avx128_iadd,         "128-bit integer adds",      AVX2)   \
+    x(avx128_iadd,         "128-bit integer serial adds",      AVX2)   \
+    x(avx128_iadd_t,       "128-bit integer parallel adds",    AVX2)   \
     x(avx128_imul,         "128-bit integer muls",      AVX2)   \
     x(avx128_fma_sparse ,  "128-bit 64-bit sparse FMAs",AVX2)   \
-    x(avx128_fma ,         "128-bit 64-bit FMAs" ,      AVX2)   \
+    x(avx128_fma ,         "128-bit serial DP FMAs" ,   AVX2)   \
+    x(avx128_fma_t ,       "128-bit parallel DP FMAs" , AVX2)   \
     x(avx256_mov_sparse,   "256-bit reg-reg mov",       AVX2)   \
     x(avx256_merge_sparse, "256-bit reg-reg merge mov", AVX512) \
-    x(avx256_iadd,         "256-bit integer adds",      AVX2)   \
+    x(avx256_iadd,         "256-bit integer serial adds",    AVX2)   \
+    x(avx256_iadd_t,       "256-bit integer parallel adds",  AVX2)   \
     x(avx256_imul,         "256-bit integer muls",      AVX2)   \
     x(avx256_fma_sparse ,  "256-bit 64-bit sparse FMAs",AVX2)   \
     x(avx256_fma ,         "256-bit serial DP FMAs" ,   AVX2)   \
