@@ -93,7 +93,11 @@ class Table {
 
     table_t rows_;
     colinfo_t colinfo_;
+    std::string sep;
+
 public:
+
+    Table() : sep(" ") {}
 
     /**
      * Get a reference to the ColInfo object for the given column, which lets you
@@ -143,6 +147,10 @@ public:
         return ss.str();
     }
 
+    void setColColumnSeparator(std::string s) {
+        sep = s;
+    }
+
 };
 
 inline void Row::str(std::ostream& os, const std::vector<size_t> sizes) const
@@ -151,7 +159,7 @@ inline void Row::str(std::ostream& os, const std::vector<size_t> sizes) const
     for (size_t c = 0; c < elems_.size(); c++) {
         const auto& e = elems_[c];
         assert(c < sizes.size());
-        if (!first) os << " "; // inter-cell padding
+        if (!first) os << table_->sep; // inter-cell padding
         first = false;
         os << justify(table_->colInfo(c), e, sizes[c]);
     }

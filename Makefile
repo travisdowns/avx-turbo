@@ -15,7 +15,7 @@ ARCH_FLAGS := -march=$(CPU_ARCH)
 endif
 O_LEVEL ?= -O2
 
-COMMON_FLAGS := -MMD -Wall $(ARCH_FLAGS) -g $(O_LEVEL)
+COMMON_FLAGS := -MMD -Wall -Wextra $(ARCH_FLAGS) -g $(O_LEVEL)
 CPPFLAGS := $(COMMON_FLAGS)
 CFLAGS := $(COMMON_FLAGS)
 
@@ -45,7 +45,7 @@ unit-test: unit-test.o unit-test-main.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) -std=c++11 $^ -o $@
 
 avx-turbo: $(OBJECTS)
-	$(CXX) $(OBJECTS) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) -std=c++11 -o $@
+	$(CXX) $(OBJECTS) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) -std=c++11 -lpthread -o $@
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c -std=c11 -o $@ $<

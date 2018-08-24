@@ -52,7 +52,7 @@ cpuid_result cpuid(int leaf) {
     return ret;
 }
 
-family_model get_family_model() {
+family_model gfm_inner() {
     auto cpuid1 = cpuid(1);
     family_model ret;
     ret.family   = (cpuid1.eax >> 8) & 0xF;
@@ -67,7 +67,12 @@ family_model get_family_model() {
     return ret;
 }
 
-uint64_t get_tsc_from_cpuid() {
+family_model get_family_model() {
+    static family_model cached_family_model = gfm_inner();
+    return cached_family_model;
+}
+
+uint64_t get_tsc_from_cpuid_inner() {
     auto cpuid15 = cpuid(0x15);
     std::printf("cpuid = %s\n", cpuid15.to_string().c_str());
 
@@ -89,6 +94,11 @@ uint64_t get_tsc_from_cpuid() {
     }
 
     return 0;
+}
+
+uint64_t get_tsc_from_cpuid() {
+    static auto cached = get_tsc_from_cpuid_inner();
+    return cached;
 }
 
 
