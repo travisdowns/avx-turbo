@@ -78,9 +78,10 @@ test_func_tput avx512_fma_t ,  vbroadcastsd, zmm, vfmadd132pd, [zero_dp]
 ; %1 - function name
 ; %2 - init instruction (e.g., xor out the variable you'll add to)
 ; %3 - loop body instruction
-%macro test_func_sparse 3
+%macro test_func_sparse 4
 define_func %1
 %2
+%4
 xor eax, eax
 .top:
 %3
@@ -90,14 +91,16 @@ jnz .top
 ret
 %endmacro
 
-test_func_sparse avx128_mov_sparse,       {vbroadcastsd ymm0, [one_dp]}, {vmovdqa xmm0, xmm0}
-test_func_sparse avx256_mov_sparse,       {vbroadcastsd ymm0, [one_dp]}, {vmovdqa ymm0, ymm0}
-test_func_sparse avx512_mov_sparse,       {vbroadcastsd zmm0, [one_dp]}, {vmovdqa32 zmm0, zmm0}
-test_func_sparse avx512_mov_merge_sparse, {vbroadcastsd zmm0, [one_dp]}, {vmovdqa32 zmm0{k1}, zmm0}
+test_func_sparse avx128_mov_sparse,       {vbroadcastsd ymm0, [one_dp]}, {vmovdqa xmm0, xmm0}, {}
+test_func_sparse avx256_mov_sparse,       {vbroadcastsd ymm0, [one_dp]}, {vmovdqa ymm0, ymm0}, {}
+test_func_sparse avx512_mov_sparse,       {vbroadcastsd zmm0, [one_dp]}, {vmovdqa32 zmm0, zmm0}, {}
+test_func_sparse avx128_merge_sparse, {vbroadcastsd ymm0, [one_dp]}, {vmovdqa32 xmm0{k1}, xmm0}, {kmovq k1, [kmask]}
+test_func_sparse avx256_merge_sparse, {vbroadcastsd ymm0, [one_dp]}, {vmovdqa32 ymm0{k1}, ymm0}, {kmovq k1, [kmask]}
+test_func_sparse avx512_merge_sparse, {vbroadcastsd zmm0, [one_dp]}, {vmovdqa32 zmm0{k1}, zmm0}, {kmovq k1, [kmask]}
 
-test_func_sparse avx128_fma_sparse, {vbroadcastsd ymm0, [zero_dp]}, {vfmadd132pd xmm0, xmm0, xmm0 }
-test_func_sparse avx256_fma_sparse, {vbroadcastsd ymm0, [zero_dp]}, {vfmadd132pd ymm0, ymm0, ymm0 }
-test_func_sparse avx512_fma_sparse, {vbroadcastsd zmm0, [zero_dp]}, {vfmadd132pd zmm0, zmm0, zmm0 }
+test_func_sparse avx128_fma_sparse, {vbroadcastsd ymm0, [zero_dp]}, {vfmadd132pd xmm0, xmm0, xmm0 }, {}
+test_func_sparse avx256_fma_sparse, {vbroadcastsd ymm0, [zero_dp]}, {vfmadd132pd ymm0, ymm0, ymm0 }, {}
+test_func_sparse avx512_fma_sparse, {vbroadcastsd zmm0, [zero_dp]}, {vfmadd132pd zmm0, zmm0, zmm0 }, {}
 
 
 GLOBAL zeroupper:function
@@ -107,6 +110,7 @@ ret
 
 zero_dp: dq 0.0
 one_dp:  dq 1.0
+kmask:   dq 0x5555555555555555
 
 
 
