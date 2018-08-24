@@ -110,6 +110,8 @@ args::ArgumentParser parser{"avx-turbo: Determine AVX2 and AVX-512 downclocking 
 args::HelpFlag help{parser, "help", "Display this help menu", {'h', "help"}};
 args::Flag arg_force_tsc_cal{parser, "force-tsc-calibrate",
     "Force manual TSC calibration loop, even if cpuid TSC Hz is available", {"force-tsc-calibrate"}};
+args::Flag arg_no_pin{parser, "--no-pin",
+    "Don't try to pin threads to CPU - gives worse results but works around affinity issues on TravisCI", {"no-pin"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
 args::ValueFlag<size_t> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
@@ -341,7 +343,9 @@ struct test_thread {
 
     void operator()() {
 //        printf("Running test in thread %d, this = %p\n", id, this);
-        pin_to_cpu(id);
+        if (!arg_no_pin) {
+            pin_to_cpu(id);
+        }
         aperf_ghz aperf_timer;
         outer_timer& outer = use_aperf ? static_cast<outer_timer&>(aperf_timer) : dummy_outer::dummy;
         barrier->wait();
@@ -376,7 +380,9 @@ int main(int argc, char** argv) {
 
     bool is_root = (geteuid() == 0);
     bool use_aperf = is_root;
-    printf("Running as root     : [%s]\n", is_root   ? "YES" : "NO ");
+    printf("Running as root     : [%s]\n", is_root     ? "YES" : "NO ");
+    printf("CPU pinning enabled : [%s]\n", !arg_no_pin ? "YES" : "NO ");
+
     ISA isas_supported = get_isas();
     printf("CPU supports AVX2   : [%s]\n", isas_supported & AVX2   ? "YES" : "NO ");
     printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
