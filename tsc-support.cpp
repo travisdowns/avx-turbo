@@ -88,11 +88,14 @@ uint64_t get_tsc_from_cpuid_inner() {
     auto family = get_family_model();
     std::printf("cpu: %s\n", family.to_string().c_str());
 
-    assert(family.family == 6);
 
-    if (family.model == 0x4E || family.model == 0x5E || family.model == 0x8E || family.model == 0x9E) {
-        // skylake client or kabylake
-        return (int64_t)24000000 * cpuid15.ebx / cpuid15.eax; // 24 MHz crystal clock
+    if (family.family == 6) {
+        if (family.model == 0x4E || family.model == 0x5E || family.model == 0x8E || family.model == 0x9E) {
+            // skylake client or kabylake
+            return (int64_t)24000000 * cpuid15.ebx / cpuid15.eax; // 24 MHz crystal clock
+        }
+    } else {
+        std::printf("CPU family not 6 (perhaps AMD or old Intel), falling back to manual TSC calibration.\n");
     }
 
     return 0;
