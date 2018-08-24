@@ -10,6 +10,7 @@
 #include <cassert>
 #include <array>
 #include <algorithm>
+#include <numeric>
 
 #include <error.h>
 
