@@ -110,6 +110,43 @@ test_func_sparse avx256_fma_sparse, {vbroadcastsd ymm0, [zero_dp]}, {vfmadd132pd
 test_func_sparse avx512_fma_sparse, {vbroadcastsd zmm0, [zero_dp]}, {vfmadd132pd zmm0, zmm0, zmm0 }, {}
 
 
+define_func ucomis
+vzeroupper
+;vbroadcastsd zmm15, [zero_dp]
+vpxord zmm15, zmm16, zmm16
+movdqu xmm0, [one_dp]
+movdqu xmm2, [one_dp]
+movdqu xmm1, [zero_dp]
+.top:
+%rep 100
+addsd   xmm0, xmm2
+ucomisd xmm1, xmm0
+ja .never    
+%endrep
+sub rdi, 100
+jnz .top
+ret
+.never:
+ud2
+
+define_func ucomis_vex
+vzeroupper
+vpxord zmm15, zmm16, zmm16
+movdqu xmm0, [one_dp]
+movdqu xmm2, [one_dp]
+movdqu xmm1, [zero_dp]
+.top:
+%rep 100
+vaddpd   xmm0, xmm0, xmm2
+%endrep
+sub rdi, 100
+jnz .top
+ret
+.never:
+ud2
+
+
+
 GLOBAL zeroupper:function
 zeroupper:
 vzeroupper
