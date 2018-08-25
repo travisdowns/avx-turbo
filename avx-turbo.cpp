@@ -53,8 +53,8 @@ struct test_func {
 
 
 #define FUNCS_X(x) \
-    x(ucomis,              "SSE scalar ucomis loop",       BASE)   \
-    x(ucomis_vex,          "VEX scalar ucomis loop",       AVX2)   \
+    x(ucomis,              "SSE scalar ucomis loop",       AVX512)   \
+    x(ucomis_vex,          "VEX scalar ucomis loop",       AVX512)   \
     x(scalar_iadd,         "Scalar integer adds",       BASE)   \
     x(avx128_mov_sparse,   "128-bit reg-reg mov",       AVX2)   \
     x(avx128_merge_sparse, "128-bit reg-reg merge mov", AVX512) \
@@ -79,8 +79,6 @@ struct test_func {
     x(avx512_fma_t,        "512-bit parallel DP FMAs",AVX512)   \
     x(avx512_mov_sparse,   "512-bit reg-reg mov",     AVX512)       \
     x(avx512_merge_sparse, "512-bit reg-reg merge mov", AVX512)   \
-    x(ucomis,              "SSE scalar ucomis loop",       BASE)   \
-    x(ucomis_vex,          "VEX scalar ucomis loop",       AVX2)   \
 
 
 #define DECLARE(f,...) cal_f f;
