@@ -317,7 +317,7 @@ struct result_holder {
 struct hot_barrier {
     size_t break_count;
     std::atomic<size_t> current;
-    hot_barrier(size_t count) : break_count(count) {}
+    hot_barrier(size_t count) : break_count(count), current{0} {}
 
     /* hot spin on the waiter count until it hits the break point */
     void wait() {
