@@ -35,12 +35,17 @@ for a summary of some options something like this:
       -h, --help                        Display this help menu
       --force-tsc-calibrate             Force manual TSC calibration loop, even
                                         if cpuid TSC Hz is available
+      --no-pin                          Don't try to pin threads to CPU - gives
+                                        worse results but works around affinity
+                                        issues on TravisCI
+      --verbose                         Output more info
       --test=[TEST-ID]                  Run only the specified test (by ID)
       --iters=[ITERS]                   Run the test loop ITERS times (default
                                         100000)
       --min-threads=[MIN]               The minimum number of threads to use
       --max-threads=[MAX]               The maximum number of threads to use
-
+      --warmup-ms=[MILLISECONDS]        Warmup milliseconds for each thread
+                                        after pinning (default 100)
 ```
 
 # output
