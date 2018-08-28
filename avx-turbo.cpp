@@ -186,19 +186,28 @@ struct aperf_ghz : outer_timer {
 
     aperf_ghz() : mperf_value(0), aperf_value(0), tsc_value(0), state(STOPPED) {}
 
-    uint64_t mperf() {
+    static uint64_t mperf() {
         return read(MSR_IA32_MPERF);
     }
 
-    uint64_t aperf() {
+    static uint64_t aperf() {
         return read(MSR_IA32_APERF);
     }
 
-    uint64_t read(uint32_t msr) {
+    static uint64_t read(uint32_t msr) {
         uint64_t value = -1;
         int res = read_msr_cur_cpu(msr, &value);
         assert(res == 0);
         return value;
+    }
+
+    /**
+     * Return true iff APERF and MPERF MSR reads appear to work
+     */
+    static bool is_supported() {
+        uint64_t dummy;
+        return     read_msr_cur_cpu(MSR_IA32_MPERF, &dummy) == 0
+                && read_msr_cur_cpu(MSR_IA32_APERF, &dummy) == 0;
     }
 
     virtual void start() override {
@@ -381,9 +390,10 @@ int main(int argc, char** argv) {
     }
 
     bool is_root = (geteuid() == 0);
-    bool use_aperf = is_root;
+    bool use_aperf = aperf_ghz::is_supported();
     printf("CPUID highest leaf  : [%2xh]\n", cpuid_highest_leaf());
     printf("Running as root     : [%s]\n", is_root     ? "YES" : "NO ");
+    printf("MSR reads supported : [%s]\n", use_aperf   ? "YES" : "NO ");
     printf("CPU pinning enabled : [%s]\n", !arg_no_pin ? "YES" : "NO ");
 
     ISA isas_supported = get_isas();
