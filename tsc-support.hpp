@@ -20,6 +20,9 @@ struct cpuid_result {
     std::string to_string();
 };
 
+/** the highest supported leaf value */
+uint32_t cpuid_highest_leaf();
+
 cpuid_result cpuid(int leaf);
 
 

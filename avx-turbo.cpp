@@ -382,6 +382,7 @@ int main(int argc, char** argv) {
 
     bool is_root = (geteuid() == 0);
     bool use_aperf = is_root;
+    printf("CPUID highest leaf  : [%2xh]\n", cpuid_highest_leaf());
     printf("Running as root     : [%s]\n", is_root     ? "YES" : "NO ");
     printf("CPU pinning enabled : [%s]\n", !arg_no_pin ? "YES" : "NO ");
 

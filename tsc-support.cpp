@@ -39,6 +39,15 @@ std::string cpuid_result::to_string() {
     return s;
 }
 
+uint32_t cpuid_highest_leaf_inner() {
+    return cpuid(0).eax;
+}
+
+uint32_t cpuid_highest_leaf() {
+    static uint32_t cached = cpuid_highest_leaf_inner();
+    return cached;
+}
+
 cpuid_result cpuid(int leaf) {
     cpuid_result ret = {};
     asm ("cpuid"
@@ -75,6 +84,11 @@ family_model get_family_model() {
 }
 
 uint64_t get_tsc_from_cpuid_inner() {
+    if (cpuid_highest_leaf() < 0x15) {
+        std::printf("CPUID doesn't support leaf 0x15, falling back to manual TSC calibration.\n");
+        return 0;
+    }
+
     auto cpuid15 = cpuid(0x15);
     std::printf("cpuid = %s\n", cpuid15.to_string().c_str());
 
