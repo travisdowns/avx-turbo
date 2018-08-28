@@ -112,13 +112,17 @@ args::ArgumentParser parser{"avx-turbo: Determine AVX2 and AVX-512 downclocking 
 args::HelpFlag help{parser, "help", "Display this help menu", {'h', "help"}};
 args::Flag arg_force_tsc_cal{parser, "force-tsc-calibrate",
     "Force manual TSC calibration loop, even if cpuid TSC Hz is available", {"force-tsc-calibrate"}};
-args::Flag arg_no_pin{parser, "--no-pin",
+args::Flag arg_no_pin{parser, "no-pin",
     "Don't try to pin threads to CPU - gives worse results but works around affinity issues on TravisCI", {"no-pin"}};
+args::Flag arg_verbose{parser, "verbose",
+    "Output more info", {"verbose"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
 args::ValueFlag<size_t> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
 args::ValueFlag<size_t> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
+args::ValueFlag<uint64_t> arg_warm_ms{parser, "MILLISECONDS", "Warmup milliseconds for each thread after pinning (default 100)", {"warmup-ms"}, 100};
 
+bool verbose;
 
 template <typename CHRONO_CLOCK>
 struct StdClock {
@@ -336,6 +340,20 @@ struct hot_barrier {
     }
 };
 
+struct warmup {
+    uint64_t millis;
+    warmup(uint64_t millis) : millis{millis} {}
+
+    void warm() {
+        int64_t start = (int64_t)RdtscClock::now();
+        size_t iters = 0;
+        while (RdtscClock::to_nanos(RdtscClock::now() - start) < 1000000u * millis) {
+            iters++;
+        }
+        if (verbose) printf("Warmup iters %lu\n", iters);
+    }
+};
+
 struct test_thread {
     size_t id;
     hot_barrier* barrier;
@@ -359,6 +377,8 @@ struct test_thread {
         }
         aperf_ghz aperf_timer;
         outer_timer& outer = use_aperf ? static_cast<outer_timer&>(aperf_timer) : dummy_outer::dummy;
+        warmup w{arg_warm_ms.Get()};
+        w.warm();
         barrier->wait();
         res.op_results = run_test<RdtscClock>(test->func, iters, outer);
         res.aperf_am   = use_aperf ? aperf_timer.am_ratio() : 0.0;
@@ -389,6 +409,7 @@ int main(int argc, char** argv) {
         exit(EXIT_SUCCESS);
     }
 
+    verbose = arg_verbose;
     bool is_root = (geteuid() == 0);
     bool use_aperf = aperf_ghz::is_supported();
     printf("CPUID highest leaf  : [%2xh]\n", cpuid_highest_leaf());
