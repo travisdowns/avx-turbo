@@ -43,6 +43,7 @@ test_func avx256_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq ymm0, ymm0, ymm0
 test_func avx256_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd ymm0, ymm0, ymm0}
 test_func avx512_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
 test_func avx512_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm0, zmm0}
+test_func avx512_vpermd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermd  zmm0, zmm0, zmm0}
 test_func avx512_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
 
 ; this is like test_func, but it uses 10 parallel chains of instructions,
@@ -74,9 +75,10 @@ jnz .top
 ret
 %endmacro
 
-test_func_tput avx128_fma_t ,  vmovddup,     xmm, vfmadd132pd, [zero_dp]
-test_func_tput avx256_fma_t ,  vbroadcastsd, ymm, vfmadd132pd, [zero_dp]
-test_func_tput avx512_fma_t ,  vbroadcastsd, zmm, vfmadd132pd, [zero_dp]
+test_func_tput avx128_fma_t ,   vmovddup,     xmm, vfmadd132pd, [zero_dp]
+test_func_tput avx256_fma_t ,   vbroadcastsd, ymm, vfmadd132pd, [zero_dp]
+test_func_tput avx512_fma_t ,   vbroadcastsd, zmm, vfmadd132pd, [zero_dp]
+test_func_tput avx512_vpermd_t ,vbroadcastsd, zmm, vpermd,      [zero_dp]
 
 ; this is like test_func except that the 100x unrolled loop instruction is
 ; always a serial scalar add, while the passed instruction to test is only

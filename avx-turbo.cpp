@@ -77,6 +77,8 @@ struct test_func {
     x(avx512_fma_sparse ,  "512-bit 64-bit sparse FMAs", AVX512)   \
     x(avx512_fma ,         "512-bit serial DP FMAs" , AVX512)   \
     x(avx512_fma_t,        "512-bit parallel DP FMAs",AVX512)   \
+    x(avx512_vpermd,       "512-bit serial DWORD permute",AVX512)   \
+    x(avx512_vpermd_t,     "512-bit parallel DWORD permute",AVX512)   \
     x(avx512_mov_sparse,   "512-bit reg-reg mov",     AVX512)       \
     x(avx512_merge_sparse, "512-bit reg-reg merge mov", AVX512)   \
 
