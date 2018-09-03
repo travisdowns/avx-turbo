@@ -43,6 +43,7 @@ test_func avx256_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq ymm0, ymm0, ymm0
 test_func avx256_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd ymm0, ymm0, ymm0}
 test_func avx512_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
 test_func avx512_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm0, zmm0}
+test_func avx512_vpermw,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermw  zmm0, zmm0, zmm0}
 test_func avx512_vpermd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermd  zmm0, zmm0, zmm0}
 test_func avx512_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
 
@@ -78,6 +79,7 @@ ret
 test_func_tput avx128_fma_t ,   vmovddup,     xmm, vfmadd132pd, [zero_dp]
 test_func_tput avx256_fma_t ,   vbroadcastsd, ymm, vfmadd132pd, [zero_dp]
 test_func_tput avx512_fma_t ,   vbroadcastsd, zmm, vfmadd132pd, [zero_dp]
+test_func_tput avx512_vpermw_t ,vbroadcastsd, zmm, vpermw,      [zero_dp]
 test_func_tput avx512_vpermd_t ,vbroadcastsd, zmm, vpermd,      [zero_dp]
 
 ; this is like test_func except that the 100x unrolled loop instruction is
