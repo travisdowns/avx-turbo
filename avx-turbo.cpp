@@ -9,6 +9,7 @@
 #include "msr-access.h"
 
 #include "args.hxx"
+#include "util.hpp"
 
 #include <cstdlib>
 #include <cinttypes>
@@ -122,6 +123,7 @@ args::Flag arg_no_pin{parser, "no-pin",
     "Don't try to pin threads to CPU - gives worse results but works around affinity issues on TravisCI", {"no-pin"}};
 args::Flag arg_verbose{parser, "verbose",
     "Output more info", {"verbose"}};
+args::Flag arg_list{parser, "list", "List the available tests and their descriptions", {"list"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of test specified by a specification string", {"spec"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
@@ -360,8 +362,38 @@ std::vector<test_spec> make_default_tests(ISA isas_supported) {
     return ret;
 }
 
+/* find the test that exactly matches the given ID or return nullptr if not found */
+const test_func *find_one_test(const std::string id) {
+    for (const auto& t : ALL_FUNCS) {
+        if (id == t.id) {
+            return &t;
+        }
+    }
+    return nullptr;
+}
+
 std::vector<test_spec> make_from_spec(ISA) {
-    throw new std::logic_error("not implemented");
+    std::string str = arg_spec.Get();
+    if (verbose) printf("Making tests from spec string: %s\n", str.c_str());
+
+    test_spec spec{str, "<multiple descriptions>"};
+    for (auto& elem : split(str,",")) {
+        if (verbose) printf("Elem: %s\n", elem.c_str());
+        std::vector<std::string> halves = split(elem,"/");
+        assert(halves.size() > 0);
+        if (halves.size() > 2) {
+            throw std::runtime_error(std::string("bad spec syntax in element: '" + elem + "'"));
+        }
+        int count = (halves.size() == 1 ? 1 : std::atoi(halves[1].c_str()));
+        const test_func* test = find_one_test(halves[0]);
+        if (!test) {
+            throw std::runtime_error("couldn't find test: '" + halves[0] + "'");
+        }
+
+        spec.thread_funcs.insert(spec.thread_funcs.end(), count, *test);
+    }
+
+    return {spec};
 }
 
 std::vector<test_spec> filter_tests(ISA isas_supported) {
@@ -499,6 +531,15 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
     printf("%s\n", table.str().c_str());
 }
 
+void list_tests() {
+    table::Table table;
+    table.newRow().add("ID").add("Description");
+    for (auto& t : ALL_FUNCS) {
+        table.newRow().add(t.id).add(t.description);
+    }
+    printf("Available tests:\n\n%s\n", table.str().c_str());
+}
+
 int main(int argc, char** argv) {
 
     try {
@@ -509,6 +550,11 @@ int main(int argc, char** argv) {
         }
     } catch (args::Help& help) {
         printf("%s\n", parser.Help().c_str());
+        exit(EXIT_SUCCESS);
+    }
+
+    if (arg_list) {
+        list_tests();
         exit(EXIT_SUCCESS);
     }
 
