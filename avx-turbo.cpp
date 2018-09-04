@@ -20,6 +20,8 @@
 #include <limits>
 #include <vector>
 #include <atomic>
+#include <deque>
+#include <exception>
 
 #include <error.h>
 #include <unistd.h>
@@ -121,6 +123,7 @@ args::Flag arg_no_pin{parser, "no-pin",
 args::Flag arg_verbose{parser, "verbose",
     "Output more info", {"verbose"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
+args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of test specified by a specification string", {"spec"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
 args::ValueFlag<size_t> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
 args::ValueFlag<size_t> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
@@ -310,25 +313,78 @@ bool should_run(const test_func& t, ISA isas_supported) {
             && (!arg_focus || arg_focus.Get() == t.id);
 }
 
-std::vector<test_func> filter_tests(ISA isas_supported) {
-    std::vector<test_func> ret;
-    for (const auto& t : ALL_FUNCS) {
-        if (should_run(t, isas_supported)) {
-            ret.push_back(t);
+/*
+ * A test_spec contains the information needed to run one test. It is composed of
+ * a list of test_funcs, which should be run in parallel on separate threads.
+ */
+struct test_spec {
+    std::string name;
+    std::string description;
+    std::vector<test_func> thread_funcs;
+
+    test_spec(std::string name, std::string description) : name{name}, description{description} {}
+
+    /** how many threads/funcs in this test */
+    size_t count() const { return thread_funcs.size(); }
+
+    std::string to_string() const {
+        std::string ret;
+        for (auto& t : thread_funcs) {
+            ret += t.id;
+            ret += ',';
+        }
+        return ret;
+    }
+};
+
+/**
+ * If the user didn't specify any particular test spec, just create for every thread count
+ * value T and runnable func, a spec with T copies of func.
+ */
+std::vector<test_spec> make_default_tests(ISA isas_supported) {
+    std::vector<test_spec> ret;
+
+    size_t maxcpus = arg_max_threads ? arg_max_threads.Get() : get_nprocs();
+    printf("Will test up to %lu CPUs\n", maxcpus);
+
+    for (size_t thread_count = arg_min_threads.Get(); thread_count <= maxcpus; thread_count++) {
+        for (const auto& t : ALL_FUNCS) {
+            if (should_run(t, isas_supported)) {
+                test_spec spec(t.id, t.description);
+                spec.thread_funcs.resize(thread_count, t); // fill with thread_count copies of t
+                ret.push_back(std::move(spec));
+            }
         }
     }
+
     return ret;
 }
 
-struct result_holder {
-    static constexpr double nan = std::numeric_limits<double>::quiet_NaN();
-    const test_func* test;
-    bool valid;
-    double    op_results;
-    double    aperf_am;
-    double    aperf_mt;
+std::vector<test_spec> make_from_spec(ISA) {
+    throw new std::logic_error("not implemented");
+}
 
-    result_holder(const test_func* test) : test(test), valid{false}, op_results(nan), aperf_am(nan), aperf_mt(nan) {}
+std::vector<test_spec> filter_tests(ISA isas_supported) {
+    if (!arg_spec) {
+        return make_default_tests(isas_supported);
+    } else {
+        return make_from_spec(isas_supported);
+    }
+}
+
+struct result {
+    static constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+    double    op_results = nan;
+    double    aperf_am = nan;
+    double    aperf_mt = nan;
+    bool valid;
+};
+
+struct result_holder {
+    const test_spec* spec;
+    std::vector<result> results; // will have spec.count() elements
+
+    result_holder(const test_spec* spec) : spec(spec) {}
 };
 
 struct hot_barrier {
@@ -363,19 +419,27 @@ struct test_thread {
     hot_barrier* barrier;
 
     /* output */
-    result_holder res;
+    result res;
 
     /* input */
     const test_func* test;
     size_t iters;
     bool use_aperf;
 
+    std::thread thread;
 
     test_thread(size_t id, hot_barrier& barrier, const test_func *test, size_t iters, bool use_aperf) :
-        id{id}, barrier{&barrier}, res{test}, test{test}, iters{iters}, use_aperf{use_aperf} {}
+        id{id}, barrier{&barrier}, test{test}, iters{iters}, use_aperf{use_aperf}, thread{std::ref(*this)}
+    {
+        if (verbose) printf("Constructed test in thread %lu, this = %p\n", id, this);
+    }
+
+    test_thread(const test_thread&) = delete;
+    test_thread(test_thread&&) = delete;
+    void operator=(const test_thread&) = delete;
 
     void operator()() {
-//        printf("Running test in thread %d, this = %p\n", id, this);
+        if (verbose) printf("Running test in thread %lu, this = %p\n", id, this);
         if (!arg_no_pin) {
             pin_to_cpu(id);
         }
@@ -387,17 +451,52 @@ struct test_thread {
         res.op_results = run_test<RdtscClock>(test->func, iters, outer);
         res.aperf_am   = use_aperf ? aperf_timer.am_ratio() : 0.0;
         res.aperf_mt   = use_aperf ? aperf_timer.mt_ratio() : 0.0;
+        res.valid = true;
     }
 };
 
 template <typename E>
-std::string result_string(const std::vector<result_holder>& results, const char* format, E e) {
+std::string result_string(const std::vector<result>& results, const char* format, E e) {
     std::string s;
     for (const auto& result : results) {
         if (!s.empty()) s += ", ";
         s += table::string_format(format, e(result));
     }
     return s;
+}
+
+void report_results(const std::vector<result_holder>& results_list, bool use_aperf) {
+    // report
+    table::Table table;
+    table.setColColumnSeparator(" | ");
+    table.colInfo(3).justify = table::ColInfo::RIGHT;
+    auto& header = table.newRow().add("Cores").add("ID").add("Description").add("Mops");
+    if (use_aperf) {
+        header.add("A/M-ratio");
+        table.colInfo(4).justify = table::ColInfo::RIGHT;
+        header.add("A/M-MHz");
+        table.colInfo(5).justify = table::ColInfo::RIGHT;
+        header.add("M/tsc-ratio");
+        table.colInfo(6).justify = table::ColInfo::RIGHT;
+    }
+
+    for (const result_holder& holder : results_list) {
+        auto spec = holder.spec;
+        auto &row = table.newRow()
+                                .add(spec->count())
+                                .add(spec->name)
+                                .add(spec->description);
+
+        auto& results = holder.results;
+        row.add(result_string(results, "%4.0f", [](const result& r){ return r.op_results * 1000; }));
+        if (use_aperf) {
+            row.add(result_string(results, "%5.2f", [](const result& r){ return r.aperf_am; }));
+            row.add(result_string(results, "%.0f",  [](const result& r){ return r.aperf_am / 1000000.0 * RdtscClock::tsc_freq(); }));
+            row.add(result_string(results, "%4.2f", [](const result& r){ return r.aperf_mt; }));
+        }
+    }
+
+    printf("%s\n", table.str().c_str());
 }
 
 int main(int argc, char** argv) {
@@ -428,73 +527,38 @@ int main(int argc, char** argv) {
 
     auto iters = arg_iters.Get();
     zeroupper();
-    auto tests = filter_tests(isas_supported);
+    auto specs = filter_tests(isas_supported);
 
-    size_t maxcpus = arg_max_threads ? arg_max_threads.Get() : get_nprocs();
-    printf("Will test up to %lu CPUs\n", maxcpus);
 
-    for (size_t thread_count = arg_min_threads.Get(); thread_count <= maxcpus; thread_count++) {
+    size_t last_thread_count = -1u;
+    std::vector<result_holder> results_list;
+    for (auto& spec : specs) {
+        // if we changed the number of threads, spit out the accumulated output
+        if (last_thread_count != -1u && last_thread_count != spec.count()) {
+            // time to print results
+            report_results(results_list, use_aperf);
+            results_list.clear();
+        }
+        last_thread_count = spec.count();
 
-        std::vector<std::vector<result_holder>> results;
+        assert(!spec.thread_funcs.empty());
+        if (verbose) printf("Running test spec: %s\n", spec.to_string().c_str());
 
         // run
-        for (size_t i = 0; i < tests.size(); i++) {
-            const test_func& test = tests.at(i);
-            hot_barrier barrier{thread_count}, dummy{0};
-            std::vector<test_thread> test_threads(thread_count, {0, dummy, nullptr, 0, false});
-            std::vector<std::thread> std_threads;
-            for (size_t t = 0; t < thread_count; t++) {
-                test_threads.at(t) = {t, barrier, &test, iters, use_aperf};
-                std_threads.emplace_back(std::ref(test_threads.at(t)));
-            }
-//            printf("THIS OUT %p\n", &t);
-            for (std::thread& t : std_threads) {
-                t.join();
-            }
-
-            results.emplace_back();
-            for (test_thread& t : test_threads) {
-                results.back().push_back(t.res);
-            }
-            assert(results.back().size() == thread_count);
+        std::deque<test_thread> threads;
+        hot_barrier barrier{spec.count()};
+        for (auto& test : spec.thread_funcs) {
+            threads.emplace_back(threads.size(), barrier, &test, iters, use_aperf);
         }
 
-        // report
-        table::Table table;
-        table.setColColumnSeparator(" | ");
-        table.colInfo(2).justify = table::ColInfo::RIGHT;
-        auto& r = table.newRow().add("ID").add("Description").add("Mops");
-        if (use_aperf) {
-            r.add("A/M-ratio");
-            table.colInfo(3).justify = table::ColInfo::RIGHT;
-            r.add("A/M-MHz");
-            table.colInfo(4).justify = table::ColInfo::RIGHT;
-            r.add("M/tsc-ratio");
-            table.colInfo(5).justify = table::ColInfo::RIGHT;
+        results_list.emplace_back(&spec);
+        for (auto& t : threads) {
+            t.thread.join();
+            results_list.back().results.push_back(t.res);
         }
-
-        assert(results.size() == tests.size());
-        for (size_t i = 0; i < tests.size(); i++) {
-            const auto& allres   = results.at(i);
-            assert(allres.size() == thread_count);
-            const auto& test = *allres.at(0).test;
-            auto& r = table.newRow()
-                    .add(test.id)
-                    .add(test.description);
-
-            r.add(result_string(allres, "%4.0f", [](const result_holder& r){ return r.op_results * 1000; }));
-            if (use_aperf) {
-                r.add(result_string(allres, "%5.2f", [](const result_holder& r){ return r.aperf_am; }));
-                r.add(result_string(allres, "%.0f",  [](const result_holder& r){ return r.aperf_am / 1000000.0 * RdtscClock::tsc_freq(); }));
-                r.add(result_string(allres, "%4.2f", [](const result_holder& r){ return r.aperf_mt; }));
-            }
-        }
-
-        printf("============================== Threads: %2lu ==============================\n%s"
-               "=========================================================================\n\n", thread_count, table.str().c_str());
     }
 
-
+    report_results(results_list, use_aperf);
 
     return EXIT_SUCCESS;
 }
