@@ -39,7 +39,11 @@ for a summary of some options something like this:
                                         worse results but works around affinity
                                         issues on TravisCI
       --verbose                         Output more info
+      --list                            List the available tests and their
+                                        descriptions
       --test=[TEST-ID]                  Run only the specified test (by ID)
+      --spec=[SPEC]                     Run a specific type of test specified by
+                                        a specification string
       --iters=[ITERS]                   Run the test loop ITERS times (default
                                         100000)
       --min-threads=[MIN]               The minimum number of threads to use
