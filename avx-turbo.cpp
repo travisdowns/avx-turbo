@@ -551,6 +551,10 @@ int main(int argc, char** argv) {
     } catch (args::Help& help) {
         printf("%s\n", parser.Help().c_str());
         exit(EXIT_SUCCESS);
+    } catch (const args::ParseError& e) {
+        printf("ERROR while parsing arguments: %s\n", e.what());
+        printf("\nUsage:\n%s\n", parser.Help().c_str());
+        exit(EXIT_FAILURE);
     }
 
     if (arg_list) {
