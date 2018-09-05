@@ -407,9 +407,13 @@ std::vector<test_spec> filter_tests(ISA isas_supported) {
 struct result {
     static constexpr double nan = std::numeric_limits<double>::quiet_NaN();
     double    op_results = nan;
+
+    uint64_t  start_ts;  // start timestamp
+    uint64_t    end_ts;  // end   timestamp
+
+    /* optional stuff associated with outer_timer */
     double    aperf_am = nan;
     double    aperf_mt = nan;
-    bool valid;
 };
 
 struct result_holder {
@@ -417,6 +421,12 @@ struct result_holder {
     std::vector<result> results; // will have spec.count() elements
 
     result_holder(const test_spec* spec) : spec(spec) {}
+
+    /** calculate the overlap ratio based on the start/end timestamps */
+    double get_overlap() const {
+        std::vector<std::pair<uint64_t, uint64_t>> ranges = transformv(results, [](const result& r){ return std::make_pair(r.start_ts, r.end_ts);} );
+        return conc_ratio(ranges.begin(), ranges.end());
+    }
 };
 
 struct hot_barrier {
@@ -480,10 +490,11 @@ struct test_thread {
         warmup w{arg_warm_ms.Get()};
         w.warm();
         barrier->wait();
+        res.start_ts = RdtscClock::now();
         res.op_results = run_test<RdtscClock>(test->func, iters, outer);
+        res.end_ts = RdtscClock::now();
         res.aperf_am   = use_aperf ? aperf_timer.am_ratio() : 0.0;
         res.aperf_mt   = use_aperf ? aperf_timer.mt_ratio() : 0.0;
-        res.valid = true;
     }
 };
 
@@ -502,14 +513,17 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
     table::Table table;
     table.setColColumnSeparator(" | ");
     table.colInfo(3).justify = table::ColInfo::RIGHT;
-    auto& header = table.newRow().add("Cores").add("ID").add("Description").add("Mops");
+    table.colInfo(4).justify = table::ColInfo::RIGHT;
+    auto& header = table.newRow().add("Cores").add("ID").add("Description").add("OVERLAP").add("Mops");
+
     if (use_aperf) {
+        size_t col = 4;
         header.add("A/M-ratio");
-        table.colInfo(4).justify = table::ColInfo::RIGHT;
+        table.colInfo(col + 0).justify = table::ColInfo::RIGHT;
         header.add("A/M-MHz");
-        table.colInfo(5).justify = table::ColInfo::RIGHT;
+        table.colInfo(col + 1).justify = table::ColInfo::RIGHT;
         header.add("M/tsc-ratio");
-        table.colInfo(6).justify = table::ColInfo::RIGHT;
+        table.colInfo(col + 2).justify = table::ColInfo::RIGHT;
     }
 
     for (const result_holder& holder : results_list) {
@@ -517,7 +531,8 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
         auto &row = table.newRow()
                                 .add(spec->count())
                                 .add(spec->name)
-                                .add(spec->description);
+                                .add(spec->description)
+                                .addf("%5.3f", holder.get_overlap());
 
         auto& results = holder.results;
         row.add(result_string(results, "%4.0f", [](const result& r){ return r.op_results * 1000; }));
