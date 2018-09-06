@@ -272,7 +272,8 @@ struct aperf_ghz : outer_timer {
 struct inner_result {
     /* calculated Mops value */
     double mops;
-    uint64_t start_ts, end_ts; // start and end timestamps for the "critical" benchmark portion
+    uint64_t ostart_ts, oend_ts;
+    uint64_t istart_ts, iend_ts; // start and end timestamps for the "critical" benchmark portion
 };
 
 /*
@@ -283,15 +284,43 @@ struct inner_result {
  * run twice, once with ITERS iterations and once with 2*ITERS, and a delta is used to
  * remove measurement overhead.
  */
-template <typename CLOCK, size_t TRIES = 101, size_t WARMUP = 3, size_t WARMDOWN = 10>
-inner_result run_test(cal_f* func, size_t iters, outer_timer& outer) {
+struct hot_barrier {
+    size_t break_count;
+    std::atomic<size_t> current;
+    hot_barrier(size_t count) : break_count(count), current{0} {}
+
+    /* increment the arrived count of the barrier (do this once per thread generally) */
+    void increment() {
+        current++;
+    }
+
+    /* return true if all the threads have arrived, never blocks */
+    bool is_broken() {
+        return current.load() == break_count;
+    }
+
+    /* increment and hot spin on the waiter count until it hits the break point, returns the spin count in case you care */
+    long wait() {
+        increment();
+        long count = 0;
+        while (!is_broken()) {
+            count++;
+        }
+        return count;
+    }
+};
+
+template <typename CLOCK, size_t TRIES = 101, size_t WARMUP = 3>
+inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier *barrier) {
     assert(iters % 100 == 0);
 
     std::array<typename CLOCK::delta_t, TRIES> results;
-    uint64_t start_ts, end_ts;
 
+    inner_result result;
+
+    result.ostart_ts = RdtscClock::now();
     for (size_t w = 0; w < WARMUP + 1; w++) {
-        start_ts = RdtscClock::now();
+        result.istart_ts = RdtscClock::now();
         outer.start();
         for (size_t r = 0; r < TRIES; r++) {
             auto t0 = CLOCK::now();
@@ -302,19 +331,20 @@ inner_result run_test(cal_f* func, size_t iters, outer_timer& outer) {
             results[r] = (t2 - t1) - (t1 - t0);
         }
         outer.stop();
-        end_ts = RdtscClock::now();
+        result.iend_ts = RdtscClock::now();
     }
 
-    for (size_t d = 0; d < WARMDOWN; d++) {
+    for (barrier->increment(); !barrier->is_broken();) {
         func(iters);
     }
+    result.oend_ts = RdtscClock::now();
 
     std::array<uint64_t, TRIES> nanos = {};
     std::transform(results.begin(), results.end(), nanos.begin(), CLOCK::to_nanos);
     DescriptiveStats stats = get_stats(nanos.begin(), nanos.end());
 
-    double ghz = ((double)iters / stats.getMedian());
-    return { ghz, start_ts, end_ts };
+    result.mops = ((double)iters / stats.getMedian());
+    return result;
 }
 
 ISA get_isas() {
@@ -444,24 +474,15 @@ struct result_holder {
 
     /** calculate the overlap ratio based on the start/end timestamps */
     double get_overlap2() const {
-        std::vector<std::pair<uint64_t, uint64_t>> ranges = transformv(results, [](const result& r){ return std::make_pair(r.inner.start_ts, r.inner.end_ts);} );
+        std::vector<std::pair<uint64_t, uint64_t>> ranges = transformv(results, [](const result& r){ return std::make_pair(r.inner.istart_ts, r.inner.iend_ts);} );
         return conc_ratio(ranges.begin(), ranges.end());
     }
-};
 
-struct hot_barrier {
-    size_t break_count;
-    std::atomic<size_t> current;
-    hot_barrier(size_t count) : break_count(count), current{0} {}
-
-    /* hot spin on the waiter count until it hits the break point, returns the spin count in case you care */
-    long wait() {
-        current++;
-        long count = 0;
-        while (current.load() < break_count) {
-            count++;
-        }
-        return count;
+    /** calculate the inner overlap ratio based on the start/end timestamps */
+    double get_overlap3() const {
+        auto orange = transformv(results, [](const result& r){ return std::make_pair(r.inner.ostart_ts, r.inner.oend_ts);} );
+        auto irange = transformv(results, [](const result& r){ return std::make_pair(r.inner.istart_ts, r.inner.iend_ts);} );
+        return nconc_ratio(orange.begin(), orange.end(), irange.begin(), irange.end());
     }
 };
 
@@ -481,7 +502,8 @@ struct warmup {
 
 struct test_thread {
     size_t id;
-    hot_barrier* barrier;
+    hot_barrier* start_barrier;
+    hot_barrier* stop_barrier;
 
     /* output */
     result res;
@@ -493,8 +515,9 @@ struct test_thread {
 
     std::thread thread;
 
-    test_thread(size_t id, hot_barrier& barrier, const test_func *test, size_t iters, bool use_aperf) :
-        id{id}, barrier{&barrier}, test{test}, iters{iters}, use_aperf{use_aperf}, thread{std::ref(*this)}
+    test_thread(size_t id, hot_barrier& start_barrier, hot_barrier& stop_barrier, const test_func *test, size_t iters, bool use_aperf) :
+        id{id}, start_barrier{&start_barrier}, stop_barrier{&stop_barrier}, test{test},
+        iters{iters}, use_aperf{use_aperf}, thread{std::ref(*this)}
     {
         // if (verbose) printf("Constructed test in thread %lu, this = %p\n", id, this);
     }
@@ -514,11 +537,11 @@ struct test_thread {
         long warms = w.warm();
         if (verbose) printf("[%2lu] Warmup iters %lu\n", id, warms);
         if (!arg_nobarrier) {
-            long count = barrier->wait();
+            long count = start_barrier->wait();
             if (verbose) printf("[%2lu] Thread loop count: %ld\n", id, count);
         }
         res.start_ts = RdtscClock::now();
-        res.inner = run_test<RdtscClock>(test->func, iters, outer);
+        res.inner = run_test<RdtscClock>(test->func, iters, outer, stop_barrier);
         res.end_ts = RdtscClock::now();
         res.aperf_am   = use_aperf ? aperf_timer.am_ratio() : 0.0;
         res.aperf_mt   = use_aperf ? aperf_timer.mt_ratio() : 0.0;
@@ -541,10 +564,11 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
     table.setColColumnSeparator(" | ");
     table.colInfo(3).justify = table::ColInfo::RIGHT;
     table.colInfo(4).justify = table::ColInfo::RIGHT;
-    auto& header = table.newRow().add("Cores").add("ID").add("Description").add("OVRLP1").add("OVRLP2").add("Mops");
+    auto& header = table.newRow().add("Cores").add("ID").add("Description")
+            .add("OVRLP1").add("OVRLP2").add("OVRLP3").add("Mops");
 
     if (use_aperf) {
-        size_t col = 5;
+        size_t col = 6;
         header.add("A/M-ratio");
         table.colInfo(col + 0).justify = table::ColInfo::RIGHT;
         header.add("A/M-MHz");
@@ -560,7 +584,8 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
                                 .add(spec->name)
                                 .add(spec->description)
                                 .addf("%5.3f", holder.get_overlap1())
-                                .addf("%5.3f", holder.get_overlap2());
+                                .addf("%5.3f", holder.get_overlap2())
+                                .addf("%5.3f", holder.get_overlap3());
 
         auto& results = holder.results;
         row.add(result_string(results, "%4.0f", [](const result& r){ return r.inner.mops * 1000; }));
@@ -639,9 +664,9 @@ int main(int argc, char** argv) {
 
         // run
         std::deque<test_thread> threads;
-        hot_barrier barrier{spec.count()};
+        hot_barrier start{spec.count()}, stop{spec.count()};
         for (auto& test : spec.thread_funcs) {
-            threads.emplace_back(threads.size(), barrier, &test, iters, use_aperf);
+            threads.emplace_back(threads.size(), start, stop, &test, iters, use_aperf);
         }
 
         results_list.emplace_back(&spec);

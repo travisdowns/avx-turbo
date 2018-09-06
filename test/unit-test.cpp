@@ -2,6 +2,8 @@
  * unit-test.cpp
  */
 
+#include <string>
+
 
 #include "catch.hpp"
 
@@ -11,9 +13,20 @@
 #include <utility>
 #include <cmath>
 
+using ipvec = std::vector<std::pair<int,int>>;
+
 template <typename... Args>
 std::vector<typename std::common_type<Args...>::type> v(Args&&... args) {
     return {args...};
+}
+
+namespace Catch {
+template<>
+struct StringMaker<std::pair<int,int>> {
+    static std::string convert( const std::pair<int,int>& p ) {
+        return std::string("(") + std::to_string(p.first) + "," + std::to_string(p.second) + ")";
+    }
+};
 }
 
 TEST_CASE( "transform" ) {
@@ -32,7 +45,7 @@ TEST_CASE( "remap" ) {
     REQUIRE(remap(0.2, 0, 1, 100, 200) == Approx(120));
 }
 
-std::pair<int,int> call_conc(const std::vector<std::pair<int,int>>& input) {
+std::pair<int,int> call_conc(const ipvec& input) {
     return concurrency(input.begin(), input.end());
 }
 
@@ -63,7 +76,26 @@ TEST_CASE( "concurrency" ) {
 
 }
 
-double call_ratio(const std::vector<std::pair<int,int>>& input) {
+std::pair<int,int> call_nconc(const ipvec& outer, const ipvec& inner) {
+    return nested_concurrency(outer.begin(), outer.end(), inner.begin(), inner.end());
+}
+
+TEST_CASE( "nested_concurrency" ) {
+
+    REQUIRE(call_nconc({}, {}) == std::make_pair(0,0));
+
+    REQUIRE(call_nconc({ {0,1} }, { {0,1} }) == std::make_pair(1,1));
+
+    REQUIRE(call_nconc({ {0,10} }, { {0,1}, {1,2} }) == std::make_pair(2,2));
+
+    REQUIRE(call_nconc({ {5,10} }, { {0,1}, {1,2} }) == std::make_pair(0,2));
+
+    REQUIRE(call_nconc({ {0,10}, {0,2} }, { {0,1}, {1,2} }) == std::make_pair(4,2));
+
+    REQUIRE(call_nconc({ {0,10}, {0,1} }, { {0,1}, {1,2} }) == std::make_pair(3,2));
+}
+
+double call_ratio(const ipvec& input) {
     return conc_ratio(input.begin(), input.end());
 }
 
