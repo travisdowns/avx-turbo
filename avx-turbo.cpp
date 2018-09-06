@@ -121,8 +121,8 @@ args::Flag arg_force_tsc_cal{parser, "force-tsc-calibrate",
     "Force manual TSC calibration loop, even if cpuid TSC Hz is available", {"force-tsc-calibrate"}};
 args::Flag arg_no_pin{parser, "no-pin",
     "Don't try to pin threads to CPU - gives worse results but works around affinity issues on TravisCI", {"no-pin"}};
-args::Flag arg_verbose{parser, "verbose",
-    "Output more info", {"verbose"}};
+args::Flag arg_verbose{parser, "verbose", "Output more info", {"verbose"}};
+args::Flag arg_nobarrier{parser, "no-barrier", "Don't sync up threads before each test (debugging only)", {"no-barrier"}};
 args::Flag arg_list{parser, "list", "List the available tests and their descriptions", {"list"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of test specified by a specification string", {"spec"}};
@@ -130,6 +130,7 @@ args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS time
 args::ValueFlag<size_t> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
 args::ValueFlag<size_t> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
 args::ValueFlag<uint64_t> arg_warm_ms{parser, "MILLISECONDS", "Warmup milliseconds for each thread after pinning (default 100)", {"warmup-ms"}, 100};
+
 
 bool verbose;
 
@@ -265,6 +266,16 @@ struct aperf_ghz : outer_timer {
 };
 
 /*
+ * The result of the run_test method, with only the stuff
+ * that can be calculated from within that method.
+ */
+struct inner_result {
+    /* calculated Mops value */
+    double mops;
+    uint64_t start_ts, end_ts; // start and end timestamps for the "critical" benchmark portion
+};
+
+/*
  * Calculate the frequency of the CPU based on timing a tight loop that we expect to
  * take one iteration per cycle.
  *
@@ -273,12 +284,14 @@ struct aperf_ghz : outer_timer {
  * remove measurement overhead.
  */
 template <typename CLOCK, size_t TRIES = 101, size_t WARMUP = 3, size_t WARMDOWN = 10>
-double run_test(cal_f* func, size_t iters, outer_timer& outer) {
+inner_result run_test(cal_f* func, size_t iters, outer_timer& outer) {
     assert(iters % 100 == 0);
 
     std::array<typename CLOCK::delta_t, TRIES> results;
+    uint64_t start_ts, end_ts;
 
     for (size_t w = 0; w < WARMUP + 1; w++) {
+        start_ts = RdtscClock::now();
         outer.start();
         for (size_t r = 0; r < TRIES; r++) {
             auto t0 = CLOCK::now();
@@ -289,6 +302,7 @@ double run_test(cal_f* func, size_t iters, outer_timer& outer) {
             results[r] = (t2 - t1) - (t1 - t0);
         }
         outer.stop();
+        end_ts = RdtscClock::now();
     }
 
     for (size_t d = 0; d < WARMDOWN; d++) {
@@ -300,7 +314,7 @@ double run_test(cal_f* func, size_t iters, outer_timer& outer) {
     DescriptiveStats stats = get_stats(nanos.begin(), nanos.end());
 
     double ghz = ((double)iters / stats.getMedian());
-    return ghz;
+    return { ghz, start_ts, end_ts };
 }
 
 ISA get_isas() {
@@ -406,7 +420,7 @@ std::vector<test_spec> filter_tests(ISA isas_supported) {
 
 struct result {
     static constexpr double nan = std::numeric_limits<double>::quiet_NaN();
-    double    op_results = nan;
+    inner_result    inner;
 
     uint64_t  start_ts;  // start timestamp
     uint64_t    end_ts;  // end   timestamp
@@ -423,8 +437,14 @@ struct result_holder {
     result_holder(const test_spec* spec) : spec(spec) {}
 
     /** calculate the overlap ratio based on the start/end timestamps */
-    double get_overlap() const {
+    double get_overlap1() const {
         std::vector<std::pair<uint64_t, uint64_t>> ranges = transformv(results, [](const result& r){ return std::make_pair(r.start_ts, r.end_ts);} );
+        return conc_ratio(ranges.begin(), ranges.end());
+    }
+
+    /** calculate the overlap ratio based on the start/end timestamps */
+    double get_overlap2() const {
+        std::vector<std::pair<uint64_t, uint64_t>> ranges = transformv(results, [](const result& r){ return std::make_pair(r.inner.start_ts, r.inner.end_ts);} );
         return conc_ratio(ranges.begin(), ranges.end());
     }
 };
@@ -434,11 +454,14 @@ struct hot_barrier {
     std::atomic<size_t> current;
     hot_barrier(size_t count) : break_count(count), current{0} {}
 
-    /* hot spin on the waiter count until it hits the break point */
-    void wait() {
+    /* hot spin on the waiter count until it hits the break point, returns the spin count in case you care */
+    long wait() {
         current++;
-        while (current.load() < break_count)
-            ;
+        long count = 0;
+        while (current.load() < break_count) {
+            count++;
+        }
+        return count;
     }
 };
 
@@ -446,13 +469,13 @@ struct warmup {
     uint64_t millis;
     warmup(uint64_t millis) : millis{millis} {}
 
-    void warm() {
+    long warm() {
         int64_t start = (int64_t)RdtscClock::now();
-        size_t iters = 0;
+        long iters = 0;
         while (RdtscClock::to_nanos(RdtscClock::now() - start) < 1000000u * millis) {
             iters++;
         }
-        if (verbose) printf("Warmup iters %lu\n", iters);
+        return iters;
     }
 };
 
@@ -473,7 +496,7 @@ struct test_thread {
     test_thread(size_t id, hot_barrier& barrier, const test_func *test, size_t iters, bool use_aperf) :
         id{id}, barrier{&barrier}, test{test}, iters{iters}, use_aperf{use_aperf}, thread{std::ref(*this)}
     {
-        if (verbose) printf("Constructed test in thread %lu, this = %p\n", id, this);
+        // if (verbose) printf("Constructed test in thread %lu, this = %p\n", id, this);
     }
 
     test_thread(const test_thread&) = delete;
@@ -481,17 +504,21 @@ struct test_thread {
     void operator=(const test_thread&) = delete;
 
     void operator()() {
-        if (verbose) printf("Running test in thread %lu, this = %p\n", id, this);
+        // if (verbose) printf("Running test in thread %lu, this = %p\n", id, this);
         if (!arg_no_pin) {
             pin_to_cpu(id);
         }
         aperf_ghz aperf_timer;
         outer_timer& outer = use_aperf ? static_cast<outer_timer&>(aperf_timer) : dummy_outer::dummy;
         warmup w{arg_warm_ms.Get()};
-        w.warm();
-        barrier->wait();
+        long warms = w.warm();
+        if (verbose) printf("[%2lu] Warmup iters %lu\n", id, warms);
+        if (!arg_nobarrier) {
+            long count = barrier->wait();
+            if (verbose) printf("[%2lu] Thread loop count: %ld\n", id, count);
+        }
         res.start_ts = RdtscClock::now();
-        res.op_results = run_test<RdtscClock>(test->func, iters, outer);
+        res.inner = run_test<RdtscClock>(test->func, iters, outer);
         res.end_ts = RdtscClock::now();
         res.aperf_am   = use_aperf ? aperf_timer.am_ratio() : 0.0;
         res.aperf_mt   = use_aperf ? aperf_timer.mt_ratio() : 0.0;
@@ -514,10 +541,10 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
     table.setColColumnSeparator(" | ");
     table.colInfo(3).justify = table::ColInfo::RIGHT;
     table.colInfo(4).justify = table::ColInfo::RIGHT;
-    auto& header = table.newRow().add("Cores").add("ID").add("Description").add("OVERLAP").add("Mops");
+    auto& header = table.newRow().add("Cores").add("ID").add("Description").add("OVRLP1").add("OVRLP2").add("Mops");
 
     if (use_aperf) {
-        size_t col = 4;
+        size_t col = 5;
         header.add("A/M-ratio");
         table.colInfo(col + 0).justify = table::ColInfo::RIGHT;
         header.add("A/M-MHz");
@@ -532,10 +559,11 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
                                 .add(spec->count())
                                 .add(spec->name)
                                 .add(spec->description)
-                                .addf("%5.3f", holder.get_overlap());
+                                .addf("%5.3f", holder.get_overlap1())
+                                .addf("%5.3f", holder.get_overlap2());
 
         auto& results = holder.results;
-        row.add(result_string(results, "%4.0f", [](const result& r){ return r.op_results * 1000; }));
+        row.add(result_string(results, "%4.0f", [](const result& r){ return r.inner.mops * 1000; }));
         if (use_aperf) {
             row.add(result_string(results, "%5.2f", [](const result& r){ return r.aperf_am; }));
             row.add(result_string(results, "%.0f",  [](const result& r){ return r.aperf_am / 1000000.0 * RdtscClock::tsc_freq(); }));
