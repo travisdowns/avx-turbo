@@ -28,6 +28,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/sysinfo.h>
+#include <err.h>
+#include <sched.h>
 
 
 #define MSR_IA32_MPERF 0x000000e7
@@ -127,8 +129,8 @@ args::Flag arg_list{parser, "list", "List the available tests and their descript
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of test specified by a specification string", {"spec"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
-args::ValueFlag<size_t> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
-args::ValueFlag<size_t> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
+args::ValueFlag<int> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
+args::ValueFlag<int> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
 args::ValueFlag<uint64_t> arg_warm_ms{parser, "MILLISECONDS", "Warmup milliseconds for each thread after pinning (default 100)", {"warmup-ms"}, 100};
 
 
@@ -387,10 +389,23 @@ struct test_spec {
  * If the user didn't specify any particular test spec, just create for every thread count
  * value T and runnable func, a spec with T copies of func.
  */
-std::vector<test_spec> make_default_tests(ISA isas_supported) {
+std::vector<test_spec> make_default_tests(ISA isas_supported, std::vector<int> cpus) {
     std::vector<test_spec> ret;
 
-    size_t maxcpus = arg_max_threads ? arg_max_threads.Get() : get_nprocs();
+    size_t maxcpus;
+    if (arg_max_threads) {
+        auto max = arg_max_threads.Get();
+        if (max > (int)cpus.size()) {
+            printf("WARNING: can't run the requested number of threads (%d) because there are only %d available logical CPUs.\n",
+                    max, (int)cpus.size());
+            maxcpus = (int)cpus.size();
+        } else {
+            maxcpus = max;
+        }
+    } else {
+        maxcpus = cpus.size();
+    }
+
     printf("Will test up to %lu CPUs\n", maxcpus);
 
     for (size_t thread_count = arg_min_threads.Get(); thread_count <= maxcpus; thread_count++) {
@@ -416,7 +431,7 @@ const test_func *find_one_test(const std::string id) {
     return nullptr;
 }
 
-std::vector<test_spec> make_from_spec(ISA) {
+std::vector<test_spec> make_from_spec(ISA, std::vector<int> cpus) {
     std::string str = arg_spec.Get();
     if (verbose) printf("Making tests from spec string: %s\n", str.c_str());
 
@@ -437,14 +452,19 @@ std::vector<test_spec> make_from_spec(ISA) {
         spec.thread_funcs.insert(spec.thread_funcs.end(), count, *test);
     }
 
+    if (spec.count() > cpus.size()) {
+        printf("ERROR: this spec requires %d CPUs but only %d are available.\n", (int)spec.count(), (int)cpus.size());
+        exit(EXIT_FAILURE);
+    }
+
     return {spec};
 }
 
-std::vector<test_spec> filter_tests(ISA isas_supported) {
+std::vector<test_spec> filter_tests(ISA isas_supported, std::vector<int> cpus) {
     if (!arg_spec) {
-        return make_default_tests(isas_supported);
+        return make_default_tests(isas_supported, cpus);
     } else {
-        return make_from_spec(isas_supported);
+        return make_from_spec(isas_supported, cpus);
     }
 }
 
@@ -608,6 +628,20 @@ void list_tests() {
     printf("Available tests:\n\n%s\n", table.str().c_str());
 }
 
+std::vector<int> get_cpus() {
+    cpu_set_t cpu_set;
+    if (sched_getaffinity(0, sizeof(cpu_set), &cpu_set)) {
+        err(EXIT_FAILURE, "failed while getting cpu affinity");
+    }
+    std::vector<int> ret;
+    for (int cpu = 0; cpu < CPU_SETSIZE; cpu++) {
+        if (CPU_ISSET(cpu, &cpu_set)) {
+            ret.push_back(cpu);
+        }
+    }
+    return ret;
+}
+
 int main(int argc, char** argv) {
 
     try {
@@ -642,11 +676,12 @@ int main(int argc, char** argv) {
     printf("CPU supports AVX2   : [%s]\n", isas_supported & AVX2   ? "YES" : "NO ");
     printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
     printf("tsc_freq = %.1f MHz (%s)\n", RdtscClock::tsc_freq() / 1000000.0, get_tsc_cal_info(arg_force_tsc_cal));
+    std::vector<int> cpus = get_cpus();
+    printf("%lu available CPUs: [%s]\n", cpus.size(), join(cpus, ", ").c_str());
 
     auto iters = arg_iters.Get();
     zeroupper();
-    auto specs = filter_tests(isas_supported);
-
+    auto specs = filter_tests(isas_supported, cpus);
 
     size_t last_thread_count = -1u;
     std::vector<result_holder> results_list;

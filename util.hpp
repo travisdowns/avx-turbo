@@ -26,6 +26,18 @@ static inline std::vector<std::string> split(const std::string &text, const std:
   return tokens;
 }
 
+template <typename C>
+static inline std::string join(const C& c, std::string sep) {
+    std::string ret;
+    for (auto& e : c) {
+        if (!ret.empty()) {
+            ret += sep;
+        }
+        ret += std::to_string(e);
+    }
+    return ret;
+}
+
 /**
  * Like std::transform, but allocates and returns a std::vector for the result.
  */
