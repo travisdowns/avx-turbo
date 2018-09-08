@@ -41,7 +41,7 @@ clean:
 
 dist-clean: clean $(CLEAN_TARGETS)
 
-unit-test: unit-test.o unit-test-main.o
+unit-test: unit-test.o unit-test-main.o cpuid.o
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) -std=c++11 $^ -o $@
 
 avx-turbo: $(OBJECTS)

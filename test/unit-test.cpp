@@ -8,6 +8,7 @@
 #include "catch.hpp"
 
 #include "../util.hpp"
+#include "../cpuid.hpp"
 
 #include <array>
 #include <utility>
@@ -114,6 +115,23 @@ TEST_CASE( "conc_ratio" ) {
     REQUIRE(call_ratio({ {0,10}, {0,3}, {0,7} }) == Approx(0.5));
 
     REQUIRE(call_ratio({ {0,10}, {0,3}, {0,7}, {11,11}, {11,11}, {11,11} }) == Approx(0.2));
+}
+
+TEST_CASE( "get_bits" ) {
+    REQUIRE(get_bits(0xF,0,0) == 1);
+    REQUIRE(get_bits(0xF,0,1) == 3);
+    REQUIRE(get_bits(0xF,0,2) == 7);
+
+    REQUIRE(get_bits(0xF,1,1) == 1);
+    REQUIRE(get_bits(0xF,1,2) == 3);
+    REQUIRE(get_bits(0xF,1,3) == 7);
+
+    REQUIRE(get_bits(0xF,3,3) == 1);
+    REQUIRE(get_bits(0xF,4,4) == 0);
+
+    REQUIRE(get_bits(0xFFFFFFFF,0,31) == 0xFFFFFFFF);
+    REQUIRE(get_bits(0xFFFFFFFF,1,31) == 0x7FFFFFFF);
+    REQUIRE(get_bits(0xFFFFFFFF,0,30) == 0x7FFFFFFF);
 }
 
 

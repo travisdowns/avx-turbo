@@ -24,6 +24,7 @@
 #include <atomic>
 #include <deque>
 #include <exception>
+#include <set>
 
 #include <error.h>
 #include <unistd.h>
@@ -127,6 +128,8 @@ args::Flag arg_no_pin{parser, "no-pin",
 args::Flag arg_verbose{parser, "verbose", "Output more info", {"verbose"}};
 args::Flag arg_nobarrier{parser, "no-barrier", "Don't sync up threads before each test (debugging only)", {"no-barrier"}};
 args::Flag arg_list{parser, "list", "List the available tests and their descriptions", {"list"}};
+args::Flag arg_hyperthreads{parser, "allow-hyperthreads", "By default we try to filter down the available cpus to include only physical cores, but "
+    "with this option we'll use all logical cores meaning you'll run two tests on cores with hyperthreading", {"allow-hyperthreads"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of test specified by a specification string", {"spec"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
@@ -643,6 +646,38 @@ std::vector<int> get_cpus() {
     return ret;
 }
 
+/* try to filter the CPU list to return only physical CPUs */
+std::vector<int> filter_cpus(std::vector<int> cpus) {
+    int shift = get_smt_shift();
+    if (shift == -1) {
+        printf("Can't use cpuid leaf 0xb to filter out hyperthreads, CPU too old or AMD");
+        return cpus;
+    }
+    cpu_set_t original_set;
+    if (sched_getaffinity(0, sizeof(original_set), &original_set)) {
+        err(EXIT_FAILURE, "failed while getting cpu affinity");
+    }
+    std::vector<int> filtered_cpus;
+    std::set<uint32_t> coreid_set;
+    for (int cpu : cpus) {
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(cpu, &cpuset);
+        if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset)) {
+            err(EXIT_FAILURE, "failed to sched_setaffinity in filter_cpus");
+        }
+        cpuid_result leafb = cpuid(0xb);
+        uint32_t apicid = leafb.edx, coreid = apicid >> shift;
+        if (verbose) printf("cpu %d has x2apic ID %u, coreid %u\n", cpu, apicid, coreid);
+        if (coreid_set.insert(coreid).second) {
+            filtered_cpus.push_back(cpu);
+        }
+    }
+    // restore original affinity
+    sched_setaffinity(0, sizeof(cpu_set_t), &original_set);
+    return filtered_cpus;
+}
+
 int main(int argc, char** argv) {
 
     try {
@@ -680,6 +715,10 @@ int main(int argc, char** argv) {
     std::vector<int> cpus = get_cpus();
     printf("CPU brand string: %s\n", get_brand_string().c_str());
     printf("%lu available CPUs: [%s]\n", cpus.size(), join(cpus, ", ").c_str());
+    if (!arg_hyperthreads) {
+        cpus = filter_cpus(cpus);
+        printf("%lu physical cores: [%s]\n", cpus.size(), join(cpus, ", ").c_str());
+    }
 
     auto iters = arg_iters.Get();
     zeroupper();

@@ -30,10 +30,19 @@ struct family_model {
 /** the highest supported leaf value */
 uint32_t cpuid_highest_leaf();
 
+/* return the CPUID result for querying the given leaf (EAX) and no subleaf (ECX=0) */
 cpuid_result cpuid(int leaf);
+
+/* return the CPUID result for querying the given leaf (EAX) and subleaf (ECX) */
+cpuid_result cpuid(int leaf, int subleaf);
 
 family_model get_family_model();
 
 std::string get_brand_string();
+
+int get_smt_shift();
+
+/* get bits [start:end] inclusive of the given value */
+uint32_t get_bits(uint32_t value, int start, int end);
 
 #endif /* CPUID_HPP_ */

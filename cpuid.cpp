@@ -28,7 +28,7 @@ uint32_t cpuid_highest_leaf() {
     return cached;
 }
 
-cpuid_result cpuid(int leaf) {
+cpuid_result cpuid(int leaf, int subleaf) {
     cpuid_result ret = {};
     asm ("cpuid"
             :
@@ -38,9 +38,13 @@ cpuid_result cpuid(int leaf) {
             "=d" (ret.edx)
             :
             "a" (leaf),
-            "c" (0)
+            "c" (subleaf)
     );
     return ret;
+}
+
+cpuid_result cpuid(int leaf) {
+    return cpuid(leaf, 0);
 }
 
 family_model gfm_inner() {
@@ -80,5 +84,40 @@ std::string get_brand_string() {
         ret += buf;
     }
     return ret;
+}
+
+/* get bits [start:end] inclusive of the given value */
+uint32_t get_bits(uint32_t value, int start, int end) {
+    value >>= start;
+    uint32_t mask = ((uint64_t)-1) << (end - start + 1);
+    return value & ~mask;
+}
+
+/**
+ * Get the shift amount for unique physical core IDs
+ */
+int get_smt_shift()
+{
+    if (cpuid_highest_leaf() < 0xb) {
+        return -1;
+    }
+    uint32_t smtShift = -1u;
+    for (uint32_t subleaf = 0; ; subleaf++) {
+        cpuid_result leafb = cpuid(0xb, subleaf);
+        uint32_t type  = get_bits(leafb.ecx, 8 ,15);
+        if (!get_bits(leafb.ebx,0,15) || type == 0) {
+            // done
+            break;
+        }
+        if (type == 1) {
+            // here's the value we are after: make sure we don't have more than one entry for
+            // this type though!
+            if (smtShift != -1u) {
+                fprintf(stderr, "Warning: more than one level of type 1 in the x2APIC hierarchy");
+            }
+            smtShift = get_bits(leafb.eax, 0, 4);
+        }
+    }
+    return smtShift;
 }
 
