@@ -15,17 +15,6 @@ static inline uint64_t rdtsc() {
     return __rdtsc();
 }
 
-struct cpuid_result {
-    std::uint32_t eax, ebx, ecx, edx;
-    std::string to_string();
-};
-
-/** the highest supported leaf value */
-uint32_t cpuid_highest_leaf();
-
-cpuid_result cpuid(int leaf);
-
-
 /**
  * Get the TSC frequency.
  *

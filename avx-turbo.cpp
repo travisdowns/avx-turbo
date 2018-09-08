@@ -7,6 +7,7 @@
 #include "table.hpp"
 #include "cpu.h"
 #include "msr-access.h"
+#include "cpuid.hpp"
 
 #include "args.hxx"
 #include "util.hpp"
@@ -677,6 +678,7 @@ int main(int argc, char** argv) {
     printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
     printf("tsc_freq = %.1f MHz (%s)\n", RdtscClock::tsc_freq() / 1000000.0, get_tsc_cal_info(arg_force_tsc_cal));
     std::vector<int> cpus = get_cpus();
+    printf("CPU brand string: %s\n", get_brand_string().c_str());
     printf("%lu available CPUs: [%s]\n", cpus.size(), join(cpus, ", ").c_str());
 
     auto iters = arg_iters.Get();

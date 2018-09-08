@@ -3,6 +3,7 @@
  */
 
 #include "tsc-support.hpp"
+#include "cpuid.hpp"
 
 #include <cinttypes>
 #include <string>
@@ -17,71 +18,7 @@
 
 using std::uint32_t;
 
-struct family_model {
-    uint8_t family;
-    uint8_t model;
-    uint8_t stepping;
-    std::string to_string() {
-        std::string s;
-        s += "family = " + std::to_string(family) + ", ";
-        s += "model = " + std::to_string(model) + ", ";
-        s += "stepping = " + std::to_string(stepping);
-        return s;
-    }
-};
 
-std::string cpuid_result::to_string() {
-    std::string s;
-    s += "eax = " + std::to_string(eax) + ", ";
-    s += "ebx = " + std::to_string(ebx) + ", ";
-    s += "ecx = " + std::to_string(ecx) + ", ";
-    s += "edx = " + std::to_string(edx);
-    return s;
-}
-
-uint32_t cpuid_highest_leaf_inner() {
-    return cpuid(0).eax;
-}
-
-uint32_t cpuid_highest_leaf() {
-    static uint32_t cached = cpuid_highest_leaf_inner();
-    return cached;
-}
-
-cpuid_result cpuid(int leaf) {
-    cpuid_result ret = {};
-    asm ("cpuid"
-            :
-            "=a" (ret.eax),
-            "=b" (ret.ebx),
-            "=c" (ret.ecx),
-            "=d" (ret.edx)
-            :
-            "a" (leaf),
-            "c" (0)
-    );
-    return ret;
-}
-
-family_model gfm_inner() {
-    auto cpuid1 = cpuid(1);
-    family_model ret;
-    ret.family   = (cpuid1.eax >> 8) & 0xF;
-    ret.model    = (cpuid1.eax >> 4) & 0xF;
-    ret.stepping = (cpuid1.eax     ) & 0xF;
-    if (ret.family == 15) {
-        ret.family += (cpuid1.eax >> 20) & 0xFF;  // extended family
-    }
-    if (ret.family == 15 || ret.family == 6) {
-        ret.model += ((cpuid1.eax >> 16) & 0xF) << 4; // extended model
-    }
-    return ret;
-}
-
-family_model get_family_model() {
-    static family_model cached_family_model = gfm_inner();
-    return cached_family_model;
-}
 
 uint64_t get_tsc_from_cpuid_inner() {
     if (cpuid_highest_leaf() < 0x15) {
