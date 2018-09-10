@@ -23,7 +23,7 @@
 #  elif defined(__has_include)
 #    if __has_include(<threads.h>)
 #      include <threads.h>
-#      define PSNIP_ONCE_BACKEND PSNIP_ONCE_BACKEND_C11
+#      define PSNIP_ONCE_BACKEND PSNIP_ONCE__BACKEND_C11
 #    endif
 #  elif defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)
 #    include <limits.h>
@@ -33,7 +33,7 @@
    first check doesn't work. */
 #    else
 #      include <threads.h>
-#      define PSNIP_ONCE_BACKEND PSNIP_ONCE_BACKEND_C11
+#      define PSNIP_ONCE_BACKEND PSNIP_ONCE__BACKEND_C11
 #    endif
 #  endif
 #endif
