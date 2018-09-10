@@ -15,7 +15,7 @@ ARCH_FLAGS := -march=$(CPU_ARCH)
 endif
 O_LEVEL ?= -O2
 
-COMMON_FLAGS := -MMD -Wall -Wextra $(ARCH_FLAGS) -g $(O_LEVEL)
+COMMON_FLAGS := -MMD -Wall -Wextra -Wundef $(ARCH_FLAGS) -g $(O_LEVEL)
 CPPFLAGS := $(COMMON_FLAGS)
 CFLAGS := $(COMMON_FLAGS)
 
