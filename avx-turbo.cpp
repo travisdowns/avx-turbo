@@ -650,7 +650,7 @@ std::vector<int> get_cpus() {
 std::vector<int> filter_cpus(std::vector<int> cpus) {
     int shift = get_smt_shift();
     if (shift == -1) {
-        printf("Can't use cpuid leaf 0xb to filter out hyperthreads, CPU too old or AMD");
+        printf("Can't use cpuid leaf 0xb to filter out hyperthreads, CPU too old or AMD\n");
         return cpus;
     }
     cpu_set_t original_set;
