@@ -5,9 +5,6 @@ include config.mk
 
 .PHONY: all clean
 
-CXX ?= g++
-CC ?= gcc
-ASM ?= nasm
 ASM_FLAGS ?= -DNASM_ENABLE_DEBUG=$(NASM_DEBUG) -w+all -l x86_methods.list
 
 ifneq ($(CPU_ARCH),)
@@ -57,7 +54,7 @@ avx-turbo: $(OBJECTS)
 	$(ASM) $(ASM_FLAGS) -f elf64 $<
 
 LOCAL_MK = $(wildcard local.mk)
-	
+
 # https://stackoverflow.com/a/3892826/149138
 dummy.rebuild: Makefile config.mk $(LOCAL_MK)
 	touch $@
