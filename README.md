@@ -2,12 +2,22 @@
 
 # avx-turbo
 
-Test the non-AVX, AVX2 and AVX-512 speeds across various active core counts
+Test the non-AVX, AVX2 and AVX-512 speeds across various active core counts. Currently it is **Linux only**, but the basic testing mechanism could be ported to OSX and Windows as well (help welcome). 
 
 # build
 
     make
     
+# msr kernel module
+
+You should load the `msr` kernel module if it is not already loaded. This is as simple as:
+
+    modprobe msr
+
+Or as complexx as (if you want nice messages about what happened:
+
+    lsmod | grep -q msr && echo "MSR already loaded" || { echo "Loading MSR module"; sudo modprobe msr ; }
+
 # run
 
 You get the most info running as root (since we can read various MSRs to calculate the frequency directly):
@@ -16,6 +26,13 @@ You get the most info running as root (since we can read various MSRs to calcula
 
 You can also run it without root, but you only get the "Mops" reading (but this can be read directly as frequency
 for the 1-latency tests). 
+
+## spec-based tests
+
+The default behavior for ./avx-turbo is to run tests with various thread counts, but with the same test on each thread. For example,
+if you run `sudo ./avx-turbo --spec avx256_fma/1,scalar_iadd/3` you'll get one copy of `avx256_fma` and three copies of `scalar_iadd` running in parallel.
+
+This mode is useful to testing that happens when not all cores are doing the same thing.
 
 # help
 
@@ -39,8 +56,15 @@ for a summary of some options something like this:
                                         worse results but works around affinity
                                         issues on TravisCI
       --verbose                         Output more info
+      --no-barrier                      Don't sync up threads before each test
+                                        (no real purpose)
       --list                            List the available tests and their
                                         descriptions
+      --allow-hyperthreads              By default we try to filter down the
+                                        available cpus to include only physical
+                                        cores, but with this option we'll use
+                                        all logical cores meaning you'll run two
+                                        tests on cores with hyperthreading
       --test=[TEST-ID]                  Run only the specified test (by ID)
       --spec=[SPEC]                     Run a specific type of test specified by
                                         a specification string
@@ -50,6 +74,7 @@ for a summary of some options something like this:
       --max-threads=[MAX]               The maximum number of threads to use
       --warmup-ms=[MILLISECONDS]        Warmup milliseconds for each thread
                                         after pinning (default 100)
+
 ```
 
 # output
