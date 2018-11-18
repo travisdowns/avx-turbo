@@ -2,7 +2,7 @@
 
 # avx-turbo
 
-Test the non-AVX, AVX2 and AVX-512 speeds across various active core counts. Currently it is **Linux only**, but the basic testing mechanism could be ported to OSX and Windows as well (help welcome). 
+Test the non-AVX, AVX2 and AVX-512 speeds for various types of CPU intensive loops, across various active core counts. Currently it is **Linux only**, but the basic testing mechanism could be ported to OSX and Windows as well (help welcome). 
 
 # build
 
