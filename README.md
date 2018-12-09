@@ -14,7 +14,7 @@ You should load the `msr` kernel module if it is not already loaded. This is as 
 
     modprobe msr
 
-Or as complexx as (if you want nice messages about what happened:
+Or as complex as (if you want nice messages about what happened):
 
     lsmod | grep -q msr && echo "MSR already loaded" || { echo "Loading MSR module"; sudo modprobe msr ; }
 
