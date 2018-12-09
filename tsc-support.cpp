@@ -31,7 +31,7 @@ uint64_t get_tsc_from_cpuid_inner() {
 
     if (cpuid15.ecx) {
         // the crystal frequency was present in ECX
-        return cpuid15.ecx * cpuid15.ebx / cpuid15.eax;
+        return (uint64_t)cpuid15.ecx * cpuid15.ebx / cpuid15.eax;
     }
 
     // ecx == 0 means we have to use a hard-coded frequency based on the model and table provided by Intel
