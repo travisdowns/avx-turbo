@@ -62,6 +62,7 @@ struct test_func {
 #define FUNCS_X(x) \
     x(ucomis,              "SSE scalar ucomis loop",       AVX512)   \
     x(ucomis_vex,          "VEX scalar ucomis loop",       AVX512)   \
+    x(pause_only,          "pause instruction",       BASE)   \
     x(scalar_iadd,         "Scalar integer adds",       BASE)   \
     x(avx128_mov_sparse,   "128-bit reg-reg mov",       AVX2)   \
     x(avx128_merge_sparse, "128-bit reg-reg merge mov", AVX512) \

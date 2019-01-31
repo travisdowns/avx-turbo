@@ -22,16 +22,18 @@ abi_checked_function %1
 ; %1 - function name
 ; %2 - init instruction (e.g., xor out the variable you'll add to)
 ; %3 - loop body instruction
-%macro test_func 3
+; %4 - repeat count, defaults to 100 - values other than 100 mean the Mops value will be wrong
+%macro test_func 3-4 100
 define_func %1
 %2
 .top:
-times 100 %3
+times %4 %3
 sub rdi, 100
 jnz .top
 ret
 %endmacro
 
+test_func pause_only,     {},             {pause}, 1
 test_func scalar_iadd,    {xor eax, eax}, {add rax, rax}
 test_func avx128_iadd,    {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq  xmm0, xmm0, xmm0}
 test_func avx128_iadd_t,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpaddq  xmm0, xmm1, xmm1}
@@ -48,26 +50,34 @@ test_func avx512_vpermd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermd  zmm0, zmm0, zmm0
 test_func avx512_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
 
 ; this is like test_func, but it uses 10 parallel chains of instructions,
-; unrolled 10 times, so (probably) max throughput
+; unrolled 10 times, so (probably) max throughput at least if latency * throughput
+; product for the instruction <= 10
 ; %1 - function name
 ; %2 - init instruction (e.g., xor out the variable you'll add to)
 ; %3 - register base like xmm, ymm, zmm
-; %3 - loop body instruction only (no operands)
-%macro test_func_tput 5
+; %4 - loop body instruction only (no operands)
+; %5 - init value for xmm0-9, used as first (dest) arg as in vfmadd132pd xmm0..9, xmm10, xmm11
+; %6 - init value for xmm10, used as second arg as in vfmadd132pd reg, xmm10, xmm11
+; %7 - init value for xmm11, used as third  arg as in vfmadd132pd reg, xmm10, xmm11
+%macro test_func_tput 7
 define_func %1
 
-; init
+; init reg 0-9
 %assign r 0
 %rep 10
 %2 %3 %+ r, %5
 %assign r (r+1)
 %endrep
 
+; init reg10, reg11
+%2 %3 %+ 10, %6
+%2 %3 %+ 11, %7
+
 .top:
 %rep 10
 %assign r 0
 %rep 10
-%4 %3 %+ r, %3 %+ r, %3 %+ r
+%4 %3 %+ r, %3 %+ 10, %3 %+ 11
 %assign r (r+1)
 %endrep
 %endrep
@@ -76,11 +86,11 @@ jnz .top
 ret
 %endmacro
 
-test_func_tput avx128_fma_t ,   vmovddup,     xmm, vfmadd132pd, [zero_dp]
-test_func_tput avx256_fma_t ,   vbroadcastsd, ymm, vfmadd132pd, [zero_dp]
-test_func_tput avx512_fma_t ,   vbroadcastsd, zmm, vfmadd132pd, [zero_dp]
-test_func_tput avx512_vpermw_t ,vbroadcastsd, zmm, vpermw,      [zero_dp]
-test_func_tput avx512_vpermd_t ,vbroadcastsd, zmm, vpermd,      [zero_dp]
+test_func_tput avx128_fma_t ,   vmovddup,     xmm, vfmadd132pd, [zero_dp], [one_dp], [half_dp]
+test_func_tput avx256_fma_t ,   vbroadcastsd, ymm, vfmadd132pd, [zero_dp], [one_dp], [half_dp]
+test_func_tput avx512_fma_t ,   vbroadcastsd, zmm, vfmadd132pd, [zero_dp], [one_dp], [half_dp]
+test_func_tput avx512_vpermw_t ,vbroadcastsd, zmm, vpermw,      [zero_dp], [one_dp], [half_dp]
+test_func_tput avx512_vpermd_t ,vbroadcastsd, zmm, vpermd,      [zero_dp], [one_dp], [half_dp]
 
 ; this is like test_func except that the 100x unrolled loop instruction is
 ; always a serial scalar add, while the passed instruction to test is only
@@ -157,6 +167,7 @@ vzeroupper
 ret
 
 zero_dp: dq 0.0
+half_dp: dq 0.5
 one_dp:  dq 1.0
 kmask:   dq 0x5555555555555555
 
