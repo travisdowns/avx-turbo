@@ -33,20 +33,48 @@ jnz .top
 ret
 %endmacro
 
+; pause
 test_func pause_only,     {},             {pause}, 1
+
+; vpermw latency
+test_func avx512_vpermw,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermw  zmm0, zmm0, zmm0}
+
+; vpermb latency
+test_func avx512_vpermd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermd  zmm0, zmm0, zmm0}
+
+; imul latency
+test_func avx128_imul,    {vpcmpeqd xmm0, xmm0, xmm0}, {vpmuldq xmm0, xmm0, xmm0}
+test_func avx256_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq ymm0, ymm0, ymm0}
+test_func avx512_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm0, zmm0}
+
+; imul throughput
+test_func avx128_imul_t,  {vpcmpeqd xmm0, xmm0, xmm0}, {vpmuldq xmm0, xmm1, xmm1}
+test_func avx256_imul_t,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq ymm0, ymm1, ymm1}
+test_func avx512_imul_t,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm1, zmm1}
+
+; iadd latency
 test_func scalar_iadd,    {xor eax, eax}, {add rax, rax}
 test_func avx128_iadd,    {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq  xmm0, xmm0, xmm0}
-test_func avx128_iadd_t,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpaddq  xmm0, xmm1, xmm1}
-test_func avx128_imul,    {vpcmpeqd xmm0, xmm0, xmm0}, {vpmuldq xmm0, xmm0, xmm0}
-test_func avx128_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd xmm0, xmm0, xmm0}
 test_func avx256_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  ymm0, ymm0, ymm0}
-test_func avx256_iadd_t,  {vpcmpeqd ymm1, ymm0, ymm0}, {vpaddq  ymm0, ymm1, ymm1}
-test_func avx256_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq ymm0, ymm0, ymm0}
-test_func avx256_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd ymm0, ymm0, ymm0}
 test_func avx512_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
-test_func avx512_imul,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm0, zmm0}
-test_func avx512_vpermw,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermw  zmm0, zmm0, zmm0}
-test_func avx512_vpermd,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpermd  zmm0, zmm0, zmm0}
+
+; iadd throughput
+test_func avx128_iadd_t,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpaddq  xmm0, xmm1, xmm1}
+test_func avx256_iadd_t,  {vpcmpeqd ymm1, ymm0, ymm0}, {vpaddq  ymm0, ymm1, ymm1}
+
+; vpsrld latency
+test_func avx128_vshift,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  xmm0, xmm0, xmm0}
+test_func avx256_vshift,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  ymm0, ymm0, ymm0}
+test_func avx512_vshift,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  zmm0, zmm0, zmm0}
+
+; vpsrld throughput
+test_func avx128_vshift_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  xmm0, xmm1, xmm1}
+test_func avx256_vshift_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  ymm0, ymm1, ymm1}
+test_func avx512_vshift_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  zmm0, zmm1, zmm1}
+
+; FMA
+test_func avx128_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd xmm0, xmm0, xmm0}
+test_func avx256_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd ymm0, ymm0, ymm0}
 test_func avx512_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
 
 ; this is like test_func, but it uses 10 parallel chains of instructions,
@@ -135,7 +163,7 @@ movdqu xmm1, [zero_dp]
 %rep 100
 addsd   xmm0, xmm2
 ucomisd xmm1, xmm0
-ja .never    
+ja .never
 %endrep
 sub rdi, 100
 jnz .top
