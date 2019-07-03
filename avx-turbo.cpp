@@ -2,36 +2,35 @@
  * avx-turbo.cpp
  */
 
+#include "args.hxx"
+#include "cpu.h"
+#include "cpuid.hpp"
+#include "msr-access.h"
 #include "stats.hpp"
 #include "tsc-support.hpp"
 #include "table.hpp"
-#include "cpu.h"
-#include "msr-access.h"
-#include "cpuid.hpp"
-
-#include "args.hxx"
 #include "util.hpp"
 
-#include <cstdlib>
-#include <cinttypes>
 #include <array>
-#include <chrono>
-#include <functional>
-#include <cassert>
-#include <thread>
-#include <limits>
-#include <vector>
 #include <atomic>
 #include <deque>
+#include <cassert>
+#include <cstdlib>
+#include <chrono>
+#include <cinttypes>
 #include <exception>
+#include <limits>
 #include <set>
+#include <functional>
+#include <thread>
+#include <vector>
 
 #include <error.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/sysinfo.h>
 #include <err.h>
 #include <sched.h>
+#include <sys/types.h>
+#include <sys/sysinfo.h>
+#include <unistd.h>
 
 
 #define MSR_IA32_MPERF 0x000000e7
@@ -60,37 +59,37 @@ struct test_func {
 
 
 #define FUNCS_X(x) \
-    x(ucomis,              "SSE scalar ucomis loop",       AVX512)   \
-    x(ucomis_vex,          "VEX scalar ucomis loop",       AVX512)   \
-    x(pause_only,          "pause instruction",       BASE)   \
-    x(scalar_iadd,         "Scalar integer adds",       BASE)   \
-    x(avx128_mov_sparse,   "128-bit reg-reg mov",       AVX2)   \
-    x(avx128_merge_sparse, "128-bit reg-reg merge mov", AVX512) \
-    x(avx128_iadd,         "128-bit integer serial adds",      AVX2)   \
-    x(avx128_iadd_t,       "128-bit integer parallel adds",    AVX2)   \
-    x(avx128_imul,         "128-bit integer muls",      AVX2)   \
-    x(avx128_fma_sparse ,  "128-bit 64-bit sparse FMAs",AVX2)   \
-    x(avx128_fma ,         "128-bit serial DP FMAs" ,   AVX2)   \
-    x(avx128_fma_t ,       "128-bit parallel DP FMAs" , AVX2)   \
-    x(avx256_mov_sparse,   "256-bit reg-reg mov",       AVX2)   \
-    x(avx256_merge_sparse, "256-bit reg-reg merge mov", AVX512) \
-    x(avx256_iadd,         "256-bit integer serial adds",    AVX2)   \
-    x(avx256_iadd_t,       "256-bit integer parallel adds",  AVX2)   \
-    x(avx256_imul,         "256-bit integer muls",      AVX2)   \
-    x(avx256_fma_sparse ,  "256-bit 64-bit sparse FMAs",AVX2)   \
-    x(avx256_fma ,         "256-bit serial DP FMAs" ,   AVX2)   \
-    x(avx256_fma_t,        "256-bit parallel DP FMAs" , AVX2)   \
-    x(avx512_iadd,         "512-bit integer adds",    AVX512)   \
-    x(avx512_imul,         "512-bit integer muls",    AVX512)   \
-    x(avx512_fma_sparse ,  "512-bit 64-bit sparse FMAs", AVX512)   \
-    x(avx512_fma ,         "512-bit serial DP FMAs" , AVX512)   \
-    x(avx512_fma_t,        "512-bit parallel DP FMAs",AVX512)   \
-    x(avx512_vpermw,       "512-bit serial  WORD permute",AVX512)   \
-    x(avx512_vpermw_t,     "512-bit parallel WORD permute",AVX512)   \
-    x(avx512_vpermd,       "512-bit serial DWORD permute",AVX512)   \
-    x(avx512_vpermd_t,     "512-bit parallel DWORD permute",AVX512)   \
-    x(avx512_mov_sparse,   "512-bit reg-reg mov",     AVX512)       \
-    x(avx512_merge_sparse, "512-bit reg-reg merge mov", AVX512)   \
+    x(ucomis              , "SSE scalar ucomis loop"         , AVX512) \
+    x(ucomis_vex          , "VEX scalar ucomis loop"         , AVX512) \
+    x(pause_only          , "pause instruction"              , BASE)   \
+    x(scalar_iadd         , "Scalar integer adds"            , BASE)   \
+    x(avx128_mov_sparse   , "128-bit reg-reg mov"            , AVX2)   \
+    x(avx128_merge_sparse , "128-bit reg-reg merge mov"      , AVX512) \
+    x(avx128_iadd         , "128-bit integer serial adds"    , AVX2  ) \
+    x(avx128_iadd_t       , "128-bit integer parallel adds"  , AVX2  ) \
+    x(avx128_imul         , "128-bit integer muls"           , AVX2  ) \
+    x(avx128_fma_sparse   , "128-bit 64-bit sparse FMAs"     , AVX2  ) \
+    x(avx128_fma          , "128-bit serial DP FMAs"         , AVX2  ) \
+    x(avx128_fma_t        , "128-bit parallel DP FMAs"       , AVX2  ) \
+    x(avx256_mov_sparse   , "256-bit reg-reg mov"            , AVX2  ) \
+    x(avx256_merge_sparse , "256-bit reg-reg merge mov"      , AVX512) \
+    x(avx256_iadd         , "256-bit integer serial adds"    , AVX2  ) \
+    x(avx256_iadd_t       , "256-bit integer parallel adds"  , AVX2  ) \
+    x(avx256_imul         , "256-bit integer muls"           , AVX2  ) \
+    x(avx256_fma_sparse   , "256-bit 64-bit sparse FMAs"     , AVX2  ) \
+    x(avx256_fma          , "256-bit serial DP FMAs"         , AVX2  ) \
+    x(avx256_fma_t        , "256-bit parallel DP FMAs"       , AVX2  ) \
+    x(avx512_iadd         , "512-bit integer adds"           , AVX512) \
+    x(avx512_imul         , "512-bit integer muls"           , AVX512) \
+    x(avx512_fma_sparse   , "512-bit 64-bit sparse FMAs"     , AVX512) \
+    x(avx512_fma          , "512-bit serial DP FMAs"         , AVX512) \
+    x(avx512_fma_t        , "512-bit parallel DP FMAs"       , AVX512) \
+    x(avx512_vpermw       , "512-bit serial WORD permute"    , AVX512) \
+    x(avx512_vpermw_t     , "512-bit parallel WORD permute"  , AVX512) \
+    x(avx512_vpermd       , "512-bit serial DWORD permute"   , AVX512) \
+    x(avx512_vpermd_t     , "512-bit parallel DWORD permute" , AVX512) \
+    x(avx512_mov_sparse   , "512-bit reg-reg mov"            , AVX512) \
+    x(avx512_merge_sparse , "512-bit reg-reg merge mov"      , AVX512) \
 
 
 #define DECLARE(f,...) cal_f f;
