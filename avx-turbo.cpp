@@ -340,6 +340,8 @@ struct hot_barrier {
     }
 };
 
+extern "C" void dirty_it();
+
 template <typename CLOCK, size_t TRIES = 101, size_t WARMUP = 3>
 inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier *barrier) {
     assert(iters % 100 == 0);
@@ -347,6 +349,8 @@ inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier
     std::array<typename CLOCK::delta_t, TRIES> results;
 
     inner_result result;
+
+    dirty_it();
 
     result.ostart_ts = RdtscClock::now();
     for (size_t w = 0; w < WARMUP + 1; w++) {
