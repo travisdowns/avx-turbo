@@ -177,6 +177,7 @@ ud2
 define_ucomis clean, {}
 define_ucomis dirty, {vpxord zmm15, zmm16, zmm16}
 define_ucomis cmp,   {vpcmpeqb  k0, zmm0, [rsp]}  ; https://stackoverflow.com/q/58568514
+define_ucomis mov,   {vmovdqu32 zmm0, zmm0}
 
 
 define_func ucomis_vex
