@@ -62,6 +62,7 @@ struct test_func {
     x(pause_only          , "pause instruction"              , BASE)   \
     x(ucomis_clean        , "scalar ucomis (clean upper 256)", AVX2)   \
     x(ucomis_dirty        , "scalar ucomis (dirty upper 256)", AVX512) \
+    x(ucomis_cmp          , "scalar ucomis (cmp upper 256)"  , AVX512) \
     x(ucomis_vex          , "VEX scalar ucomis loop"         , AVX512) \
                                                                        \
     /* iadd */                                                         \
