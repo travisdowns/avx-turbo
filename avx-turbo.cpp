@@ -352,6 +352,8 @@ inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier
 
     dirty_it();
 
+    sleep(1);
+
     result.ostart_ts = RdtscClock::now();
     for (size_t w = 0; w < WARMUP + 1; w++) {
         result.istart_ts = RdtscClock::now();
