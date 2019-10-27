@@ -161,7 +161,7 @@ vzeroupper
 movdqu xmm0, [one_dp]
 movdqu xmm2, [one_dp]
 movdqu xmm1, [zero_dp]
-
+align 64
 .top:
 %rep 100
 addsd   xmm0, xmm2
