@@ -155,12 +155,13 @@ test_func_sparse avx512_fma_sparse, {vbroadcastsd zmm0, [zero_dp]}, {vfmadd132pd
 ; %2 dirty instruction
 %macro define_ucomis 2
 define_func ucomis_%1
-vpxor xmm0, xmm0, xmm0
+vpxor xmm15, xmm15, xmm15
 vzeroupper
 %2
 movdqu xmm0, [one_dp]
 movdqu xmm2, [one_dp]
 movdqu xmm1, [zero_dp]
+
 .top:
 %rep 100
 addsd   xmm0, xmm2
@@ -176,8 +177,8 @@ ud2
 
 define_ucomis clean, {}
 define_ucomis dirty, {vpxord zmm15, zmm16, zmm16}
-define_ucomis cmp,   {vpcmpeqb  k0, zmm0, [rsp]}  ; https://stackoverflow.com/q/58568514
-define_ucomis mov,   {vmovdqu32 zmm0, zmm0}
+define_ucomis cmp,   {vpcmpeqb  k0, zmm15, [rsp]}  ; https://stackoverflow.com/q/58568514
+define_ucomis mov,   {vmovdqu32 zmm15, zmm15}
 
 
 define_func ucomis_vex
