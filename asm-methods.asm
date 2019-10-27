@@ -182,7 +182,7 @@ define_ucomis mov,   {vmovdqu32 zmm15, zmm15}
 
 
 define_func dirty_it
-vpxord zmm15, zmm16, zmm16
+vpcmpeqb  k0, zmm15, [rsp]
 ret
 
 define_func ucomis_vex
