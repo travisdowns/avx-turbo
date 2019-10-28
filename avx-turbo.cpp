@@ -84,13 +84,22 @@ struct test_func {
     x(avx512_merge_sparse , "512-bit reg-reg merge mov"      , AVX512) \
                                                                        \
     /* variable shift latency */                                       \
-    x(avx128_vshift       , "128-bit variable shift (vpsrld)", AVX2  ) \
-    x(avx256_vshift       , "256-bit variable shift (vpsrld)", AVX2  ) \
-    x(avx512_vshift       , "512-bit variable shift (vpsrld)", AVX512) \
+    x(avx128_vshift       , "128-bit variable shift (vpsrlvd)", AVX2  ) \
+    x(avx256_vshift       , "256-bit variable shift (vpsrlvd)", AVX2  ) \
+    x(avx512_vshift       , "512-bit variable shift (vpsrlvd)", AVX512) \
     /* variable shift throughput */                                    \
-    x(avx128_vshift_t     , "128-bit variable shift (vpsrld)", AVX2  ) \
-    x(avx256_vshift_t     , "256-bit variable shift (vpsrld)", AVX2  ) \
-    x(avx512_vshift_t     , "512-bit variable shift (vpsrld)", AVX512) \
+    x(avx128_vshift_t     , "128-bit variable shift (vpsrlvd)", AVX2  ) \
+    x(avx256_vshift_t     , "256-bit variable shift (vpsrlvd)", AVX2  ) \
+    x(avx512_vshift_t     , "512-bit variable shift (vpsrlvd)", AVX512) \
+                                                                       \
+    /* vplzcntd latency */                                             \
+    x(avx128_vlzcnt       , "128-bit lzcnt (vplzcntd)",        AVX512) \
+    x(avx256_vlzcnt       , "256-bit lzcnt (vplzcntd)",        AVX512) \
+    x(avx512_vlzcnt       , "512-bit lzcnt (vplzcntd)",        AVX512) \
+    /* vplzcntd throughput */                                          \
+    x(avx128_vlzcnt_t     , "128-bit lzcnt (vplzcntd)",        AVX512) \
+    x(avx256_vlzcnt_t     , "256-bit lzcnt (vplzcntd)",        AVX512) \
+    x(avx512_vlzcnt_t     , "512-bit lzcnt (vplzcntd)",        AVX512) \
                                                                        \
     x(avx128_imul         , "128-bit integer muls"           , AVX2  ) \
     x(avx256_imul         , "256-bit integer muls"           , AVX2  ) \

@@ -62,15 +62,25 @@ test_func avx512_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0
 test_func avx128_iadd_t,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpaddq  xmm0, xmm1, xmm1}
 test_func avx256_iadd_t,  {vpcmpeqd ymm1, ymm0, ymm0}, {vpaddq  ymm0, ymm1, ymm1}
 
-; vpsrld latency
+; vpsrlvd latency
 test_func avx128_vshift,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  xmm0, xmm0, xmm0}
 test_func avx256_vshift,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  ymm0, ymm0, ymm0}
 test_func avx512_vshift,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  zmm0, zmm0, zmm0}
 
-; vpsrld throughput
+; vpsrlvd throughput
 test_func avx128_vshift_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  xmm0, xmm1, xmm1}
 test_func avx256_vshift_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  ymm0, ymm1, ymm1}
 test_func avx512_vshift_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  zmm0, zmm1, zmm1}
+
+; vplzcntd latency
+test_func avx128_vlzcnt,  {vpcmpeqd xmm1, xmm0, xmm0}, {vplzcntd  xmm0, xmm0}
+test_func avx256_vlzcnt,  {vpcmpeqd xmm1, xmm0, xmm0}, {vplzcntd  ymm0, ymm0}
+test_func avx512_vlzcnt,  {vpcmpeqd xmm1, xmm0, xmm0}, {vplzcntd  zmm0, zmm0}
+
+; vplzcntd throughput
+test_func avx128_vlzcnt_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vplzcntd  xmm0, xmm1}
+test_func avx256_vlzcnt_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vplzcntd  ymm0, ymm1}
+test_func avx512_vlzcnt_t,{vpcmpeqd xmm1, xmm0, xmm0}, {vplzcntd  zmm0, zmm1}
 
 ; FMA
 test_func avx128_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd xmm0, xmm0, xmm0}
