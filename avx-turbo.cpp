@@ -62,7 +62,6 @@ struct test_func {
     x(pause_only          , "pause instruction"              , BASE)   \
     x(ucomis_clean        , "scalar ucomis (w/ vzeroupper)"  , AVX2)   \
     x(ucomis_dirty        , "scalar ucomis (no vzeroupper)"  , AVX512) \
-    x(ucomis_vex          , "VEX scalar ucomis loop"         , AVX512) \
                                                                        \
     /* iadd */                                                         \
     x(scalar_iadd         , "Scalar integer adds"            , BASE)   \

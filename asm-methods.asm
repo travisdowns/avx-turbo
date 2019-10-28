@@ -184,24 +184,6 @@ vzeroupper
 vpxord zmm15, zmm14, zmm15
 ret
 
-define_func ucomis_vex
-vzeroupper
-vpxord zmm15, zmm16, zmm16
-movdqu xmm0, [one_dp]
-movdqu xmm2, [one_dp]
-movdqu xmm1, [zero_dp]
-.top:
-%rep 100
-vaddpd   xmm0, xmm0, xmm2
-%endrep
-sub rdi, 100
-jnz .top
-ret
-.never:
-ud2
-
-
-
 GLOBAL zeroupper:function
 zeroupper:
 vzeroupper
