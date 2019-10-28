@@ -60,10 +60,8 @@ struct test_func {
 
 #define FUNCS_X(x) \
     x(pause_only          , "pause instruction"              , BASE)   \
-    x(ucomis_clean        , "scalar ucomis (clean upper 256)", AVX2)   \
-    x(ucomis_dirty        , "scalar ucomis (dirty upper 256)", AVX512) \
-    x(ucomis_cmp          , "scalar ucomis (cmp upper 256)"  , AVX512) \
-    x(ucomis_mov          , "scalar ucomis (mov 512)"        , AVX512) \
+    x(ucomis_clean        , "scalar ucomis (w/ vzeroupper)"  , AVX2)   \
+    x(ucomis_dirty        , "scalar ucomis (no vzeroupper)"  , AVX512) \
     x(ucomis_vex          , "VEX scalar ucomis loop"         , AVX512) \
                                                                        \
     /* iadd */                                                         \
@@ -154,6 +152,8 @@ args::Flag arg_nobarrier{parser, "no-barrier", "Don't sync up threads before eac
 args::Flag arg_list{parser, "list", "List the available tests and their descriptions", {"list"}};
 args::Flag arg_hyperthreads{parser, "allow-hyperthreads", "By default we try to filter down the available cpus to include only physical cores, but "
     "with this option we'll use all logical cores meaning you'll run two tests on cores with hyperthreading", {"allow-hyperthreads"}};
+args::Flag arg_dirty{parser, "dirty-upper", "AVX-512 only: a 512-bit zmm register is dirtied befor each test",
+    {"dirty-upper"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of test specified by a specification string", {"spec"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
@@ -350,9 +350,9 @@ inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier
 
     inner_result result;
 
-    dirty_it();
-
-    sleep(1);
+    if (arg_dirty) {
+        dirty_it();
+    }
 
     result.ostart_ts = RdtscClock::now();
     for (size_t w = 0; w < WARMUP + 1; w++) {
@@ -748,6 +748,11 @@ int main(int argc, char** argv) {
     if (!arg_hyperthreads) {
         cpus = filter_cpus(cpus);
         printf("%lu physical cores: [%s]\n", cpus.size(), join(cpus, ", ").c_str());
+    }
+
+    if (arg_dirty && !(isas_supported & AVX512)) {
+        printf("ERROR: --dirty-upper only supported on AVX-512 hardware\n");
+        exit(EXIT_FAILURE);
     }
 
     auto iters = arg_iters.Get();

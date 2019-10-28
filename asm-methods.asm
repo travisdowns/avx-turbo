@@ -175,14 +175,13 @@ ret
 ud2
 %endmacro
 
-define_ucomis clean, {}
-define_ucomis dirty, {vpxord zmm15, zmm16, zmm16}
-define_ucomis cmp,   {vpcmpeqb  k0, zmm15, [rsp]}  ; https://stackoverflow.com/q/58568514
-define_ucomis mov,   {vmovdqu32 zmm15, zmm15}
+define_ucomis clean, {vzeroupper}
+define_ucomis dirty, {}
 
 
 define_func dirty_it
-vpcmpeqb  k0, zmm15, [rsp]
+vzeroupper
+vpxord zmm15, zmm14, zmm15
 ret
 
 define_func ucomis_vex
