@@ -160,8 +160,10 @@ args::Flag arg_nobarrier{parser, "no-barrier", "Don't sync up threads before eac
 args::Flag arg_list{parser, "list", "List the available tests and their descriptions", {"list"}};
 args::Flag arg_hyperthreads{parser, "allow-hyperthreads", "By default we try to filter down the available cpus to include only physical cores, but "
     "with this option we'll use all logical cores meaning you'll run two tests on cores with hyperthreading", {"allow-hyperthreads"}};
-args::Flag arg_dirty{parser, "dirty-upper", "AVX-512 only: a 512-bit zmm register is dirtied befor each test",
+args::Flag arg_dirty{parser, "dirty-upper", "AVX-512 only: the 512-bit zmm15 register is dirtied befor each test",
     {"dirty-upper"}};
+args::Flag arg_dirty16{parser, "dirty-upper", "AVX-512 only: the 512-bit zmm16 register is dirtied befor each test",
+    {"dirty-upper16"}};
 args::ValueFlag<std::string> arg_focus{parser, "TEST-ID", "Run only the specified test (by ID)", {"test"}};
 args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of test specified by a specification string", {"spec"}};
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
@@ -348,7 +350,10 @@ struct hot_barrier {
     }
 };
 
+// dirties zmm15 upper bits
 extern "C" void dirty_it();
+// dirties zmm15 upper bits
+extern "C" void dirty_it16();
 
 template <typename CLOCK, size_t TRIES = 101, size_t WARMUP = 3>
 inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier *barrier) {
@@ -360,6 +365,10 @@ inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier
 
     if (arg_dirty) {
         dirty_it();
+    }
+
+    if (arg_dirty16) {
+        dirty_it16();
     }
 
     result.ostart_ts = RdtscClock::now();

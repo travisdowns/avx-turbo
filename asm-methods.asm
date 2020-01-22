@@ -194,6 +194,11 @@ vzeroupper
 vpxord zmm15, zmm14, zmm15
 ret
 
+define_func dirty_it16
+vzeroupper
+vpxord zmm16, zmm14, zmm15
+ret
+
 GLOBAL zeroupper:function
 zeroupper:
 vzeroupper
