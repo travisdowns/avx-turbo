@@ -54,9 +54,16 @@ test_func avx512_imul_t,  {vpcmpeqd ymm0, ymm0, ymm0}, {vpmuldq zmm0, zmm1, zmm1
 
 ; iadd latency
 test_func scalar_iadd,    {xor eax, eax}, {add rax, rax}
+
 test_func avx128_iadd,    {vpcmpeqd xmm0, xmm0, xmm0}, {vpaddq  xmm0, xmm0, xmm0}
 test_func avx256_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  ymm0, ymm0, ymm0}
 test_func avx512_iadd,    {vpcmpeqd ymm0, ymm0, ymm0}, {vpaddq  zmm0, zmm0, zmm0}
+
+; iadd latency with zmm16
+test_func avx128_iadd16,  {vpternlogd xmm16, xmm16, xmm16, 0xff}, {vpaddq  xmm16, xmm16, xmm16}
+test_func avx256_iadd16,  {vpternlogd ymm16, ymm16, ymm16, 0xff}, {vpaddq  ymm16, ymm16, ymm16}
+test_func avx512_iadd16,  {vpternlogd zmm16, zmm16, zmm16, 0xff}, {vpaddq  zmm16, zmm16, zmm16}
+
 
 ; iadd throughput
 test_func avx128_iadd_t,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpaddq  xmm0, xmm1, xmm1}

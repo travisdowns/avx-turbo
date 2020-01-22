@@ -67,7 +67,11 @@ struct test_func {
     x(scalar_iadd         , "Scalar integer adds"            , BASE)   \
     x(avx128_iadd         , "128-bit integer serial adds"    , AVX2  ) \
     x(avx256_iadd         , "256-bit integer serial adds"    , AVX2  ) \
-    x(avx512_iadd         , "512-bit integer adds"           , AVX512) \
+    x(avx512_iadd         , "512-bit integer series adds"    , AVX512) \
+                                                                       \
+    x(avx128_iadd16     , "128-bit integer serial adds zmm16", AVX2  ) \
+    x(avx256_iadd16     , "256-bit integer serial adds zmm16", AVX2  ) \
+    x(avx512_iadd16     , "512-bit integer series adds zmm16", AVX512) \
                                                                        \
     /* iadd throughput */                                              \
     x(avx128_iadd_t       , "128-bit integer parallel adds"  , AVX2  ) \
