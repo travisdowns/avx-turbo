@@ -137,7 +137,13 @@ FUNCS_X(DECLARE);
 
 
 // misc helpers
-void zeroupper();
+void zeroupper_asm();
+
+static bool zeroupper_allowed;
+
+void zeroupper() {
+    if (zeroupper_allowed) zeroupper_asm();
+}
 
 }
 
@@ -775,6 +781,8 @@ int main(int argc, char** argv) {
     printf("CPU pinning enabled   : [%s]\n", !arg_no_pin ? "YES" : "NO ");
 
     ISA isas_supported = get_isas();
+    zeroupper_allowed = isas_supported & AVX2;
+    printf("CPU supports zeroupper: [%s]\n", zeroupper_allowed         ? "YES" : "NO ");
     printf("CPU supports AVX2     : [%s]\n", isas_supported & AVX2     ? "YES" : "NO ");
     printf("CPU supports AVX-512F : [%s]\n", isas_supported & AVX512F  ? "YES" : "NO ");
     printf("CPU supports AVX-512VL: [%s]\n", isas_supported & AVX512VL ? "YES" : "NO ");

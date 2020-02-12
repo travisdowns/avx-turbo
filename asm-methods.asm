@@ -206,8 +206,8 @@ vzeroupper
 vpxord zmm16, zmm14, zmm15
 ret
 
-GLOBAL zeroupper:function
-zeroupper:
+GLOBAL zeroupper_asm:function
+zeroupper_asm:
 vzeroupper
 ret
 
