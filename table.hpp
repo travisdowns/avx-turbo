@@ -32,7 +32,7 @@ std::string string_format(const std::string& format, Args ... args) {
 class Table;
 
 struct ColInfo {
-    enum { LEFT, RIGHT } justify;
+    enum Justification { LEFT, RIGHT } justify;
     ColInfo() : justify(LEFT) {}
 };
 
@@ -84,6 +84,11 @@ public:
     Row& addf(const char* format, Args ... args) {
         elems_.push_back(string_format(format, args...));
         return *this;
+    }
+
+    /** the number of elements currently in the row */
+    size_t size() {
+        return elems_.size();
     }
 };
 

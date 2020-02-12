@@ -44,9 +44,12 @@ using namespace Stats;
 typedef void (cal_f)(uint64_t iters);
 
 enum ISA {
-    BASE   = 1,
-    AVX2   = 2,
-    AVX512 = 4
+    BASE     = 1 << 0,
+    AVX2     = 1 << 1,
+    AVX512F  = 1 << 2, // note: does not imply VL, so xmm and ymm may not be available
+    AVX512VL = 1 << 3, // note: does not imply F, although i don't know any CPU with VL but not F
+    AVX512CD = 1 << 4,
+    AVX512BW = 1 << 5,
 };
 
 struct test_func {
@@ -59,71 +62,71 @@ struct test_func {
 
 
 #define FUNCS_X(x) \
-    x(pause_only          , "pause instruction"              , BASE)   \
-    x(ucomis_clean        , "scalar ucomis (w/ vzeroupper)"  , AVX2)   \
-    x(ucomis_dirty        , "scalar ucomis (no vzeroupper)"  , AVX512) \
-                                                                       \
-    /* iadd */                                                         \
-    x(scalar_iadd         , "Scalar integer adds"            , BASE)   \
-    x(avx128_iadd         , "128-bit integer serial adds"    , AVX2  ) \
-    x(avx256_iadd         , "256-bit integer serial adds"    , AVX2  ) \
-    x(avx512_iadd         , "512-bit integer series adds"    , AVX512) \
-                                                                       \
-    x(avx128_iadd16     , "128-bit integer serial adds zmm16", AVX2  ) \
-    x(avx256_iadd16     , "256-bit integer serial adds zmm16", AVX2  ) \
-    x(avx512_iadd16     , "512-bit integer series adds zmm16", AVX512) \
-                                                                       \
-    /* iadd throughput */                                              \
-    x(avx128_iadd_t       , "128-bit integer parallel adds"  , AVX2  ) \
-    x(avx256_iadd_t       , "256-bit integer parallel adds"  , AVX2  ) \
-                                                                       \
-    /* reg-reg mov */                                                  \
-    x(avx128_mov_sparse   , "128-bit reg-reg mov"            , AVX2)   \
-    x(avx256_mov_sparse   , "256-bit reg-reg mov"            , AVX2  ) \
-    x(avx512_mov_sparse   , "512-bit reg-reg mov"            , AVX512) \
-                                                                       \
+    x(pause_only          , "pause instruction"              , BASE)     \
+    x(ucomis_clean        , "scalar ucomis (w/ vzeroupper)"  , AVX2)     \
+    x(ucomis_dirty        , "scalar ucomis (no vzeroupper)"  , AVX2)     \
+                                                                         \
+    /* iadd */                                                           \
+    x(scalar_iadd         , "Scalar integer adds"            , BASE)     \
+    x(avx128_iadd         , "128-bit integer serial adds"    , AVX2  )   \
+    x(avx256_iadd         , "256-bit integer serial adds"    , AVX2  )   \
+    x(avx512_iadd         , "512-bit integer series adds"    , AVX512F)  \
+                                                                         \
+    x(avx128_iadd16     , "128-bit integer serial adds zmm16", AVX512VL) \
+    x(avx256_iadd16     , "256-bit integer serial adds zmm16", AVX512VL) \
+    x(avx512_iadd16     , "512-bit integer series adds zmm16", AVX512F)  \
+                                                                         \
+    /* iadd throughput */                                                \
+    x(avx128_iadd_t       , "128-bit integer parallel adds"  , AVX2  )   \
+    x(avx256_iadd_t       , "256-bit integer parallel adds"  , AVX2  )   \
+                                                                         \
+    /* reg-reg mov */                                                    \
+    x(avx128_mov_sparse   , "128-bit reg-reg mov"            , AVX2)     \
+    x(avx256_mov_sparse   , "256-bit reg-reg mov"            , AVX2  )   \
+    x(avx512_mov_sparse   , "512-bit reg-reg mov"            , AVX512F)  \
+                                                                         \
     /* merge */                                                        \
-    x(avx128_merge_sparse , "128-bit reg-reg merge mov"      , AVX512) \
-    x(avx256_merge_sparse , "256-bit reg-reg merge mov"      , AVX512) \
-    x(avx512_merge_sparse , "512-bit reg-reg merge mov"      , AVX512) \
+    x(avx128_merge_sparse , "128-bit reg-reg merge mov"      , AVX512VL) \
+    x(avx256_merge_sparse , "256-bit reg-reg merge mov"      , AVX512VL) \
+    x(avx512_merge_sparse , "512-bit reg-reg merge mov"      , AVX512F) \
                                                                        \
     /* variable shift latency */                                       \
     x(avx128_vshift       , "128-bit variable shift (vpsrlvd)", AVX2  ) \
     x(avx256_vshift       , "256-bit variable shift (vpsrlvd)", AVX2  ) \
-    x(avx512_vshift       , "512-bit variable shift (vpsrlvd)", AVX512) \
+    x(avx512_vshift       , "512-bit variable shift (vpsrlvd)", AVX512F) \
     /* variable shift throughput */                                    \
     x(avx128_vshift_t     , "128-bit variable shift (vpsrlvd)", AVX2  ) \
     x(avx256_vshift_t     , "256-bit variable shift (vpsrlvd)", AVX2  ) \
-    x(avx512_vshift_t     , "512-bit variable shift (vpsrlvd)", AVX512) \
+    x(avx512_vshift_t     , "512-bit variable shift (vpsrlvd)", AVX512F) \
                                                                        \
     /* vplzcntd latency */                                             \
-    x(avx128_vlzcnt       , "128-bit lzcnt (vplzcntd)",        AVX512) \
-    x(avx256_vlzcnt       , "256-bit lzcnt (vplzcntd)",        AVX512) \
-    x(avx512_vlzcnt       , "512-bit lzcnt (vplzcntd)",        AVX512) \
-    /* vplzcntd throughput */                                          \
-    x(avx128_vlzcnt_t     , "128-bit lzcnt (vplzcntd)",        AVX512) \
-    x(avx256_vlzcnt_t     , "256-bit lzcnt (vplzcntd)",        AVX512) \
-    x(avx512_vlzcnt_t     , "512-bit lzcnt (vplzcntd)",        AVX512) \
-                                                                       \
-    x(avx128_imul         , "128-bit integer muls"           , AVX2  ) \
-    x(avx256_imul         , "256-bit integer muls"           , AVX2  ) \
-    x(avx512_imul         , "512-bit integer muls"           , AVX512) \
+    x(avx128_vlzcnt       , "128-bit lzcnt (vplzcntd)",        AVX512CD | AVX512VL) \
+    x(avx256_vlzcnt       , "256-bit lzcnt (vplzcntd)",        AVX512CD | AVX512VL) \
+    x(avx512_vlzcnt       , "512-bit lzcnt (vplzcntd)",        AVX512CD)            \
+    /* vplzcntd throughput */                                                       \
+    x(avx128_vlzcnt_t     , "128-bit lzcnt (vplzcntd)",        AVX512CD | AVX512VL) \
+    x(avx256_vlzcnt_t     , "256-bit lzcnt (vplzcntd)",        AVX512CD | AVX512VL) \
+    x(avx512_vlzcnt_t     , "512-bit lzcnt (vplzcntd)",        AVX512CD)            \
+                                                                        \
+    x(avx128_imul         , "128-bit integer muls (vpmuldq)" , AVX2   ) \
+    x(avx256_imul         , "256-bit integer muls (vpmuldq)" , AVX2   ) \
+    x(avx512_imul         , "512-bit integer muls (vpmuldq)" , AVX512F) \
                                                                        \
     /* fma */                                                          \
     x(avx128_fma_sparse   , "128-bit 64-bit sparse FMAs"     , AVX2  ) \
     x(avx256_fma_sparse   , "256-bit 64-bit sparse FMAs"     , AVX2  ) \
-    x(avx512_fma_sparse   , "512-bit 64-bit sparse FMAs"     , AVX512) \
+    x(avx512_fma_sparse   , "512-bit 64-bit sparse FMAs"     , AVX512F) \
     x(avx128_fma          , "128-bit serial DP FMAs"         , AVX2  ) \
     x(avx256_fma          , "256-bit serial DP FMAs"         , AVX2  ) \
-    x(avx512_fma          , "512-bit serial DP FMAs"         , AVX512) \
+    x(avx512_fma          , "512-bit serial DP FMAs"         , AVX512F) \
     x(avx128_fma_t        , "128-bit parallel DP FMAs"       , AVX2  ) \
     x(avx256_fma_t        , "256-bit parallel DP FMAs"       , AVX2  ) \
-    x(avx512_fma_t        , "512-bit parallel DP FMAs"       , AVX512) \
+    x(avx512_fma_t        , "512-bit parallel DP FMAs"       , AVX512F) \
                                                                        \
-    x(avx512_vpermw       , "512-bit serial WORD permute"    , AVX512) \
-    x(avx512_vpermw_t     , "512-bit parallel WORD permute"  , AVX512) \
-    x(avx512_vpermd       , "512-bit serial DWORD permute"   , AVX512) \
-    x(avx512_vpermd_t     , "512-bit parallel DWORD permute" , AVX512) \
+    x(avx512_vpermw       , "512-bit serial WORD permute"    , AVX512BW) \
+    x(avx512_vpermw_t     , "512-bit parallel WORD permute"  , AVX512BW) \
+    x(avx512_vpermd       , "512-bit serial DWORD permute"   , AVX512F) \
+    x(avx512_vpermd_t     , "512-bit parallel DWORD permute" , AVX512F) \
 
 
 #define DECLARE(f,...) cal_f f;
@@ -138,7 +141,7 @@ void zeroupper();
 
 }
 
-#define MAKE_STRUCT(f, d, i) { f, #f, d, i },
+#define MAKE_STRUCT(f, d, i) { f, #f, d, (ISA)(i) },
 const test_func ALL_FUNCS[] = {
 FUNCS_X(MAKE_STRUCT)
 };
@@ -406,13 +409,16 @@ inner_result run_test(cal_f* func, size_t iters, outer_timer& outer, hot_barrier
 
 ISA get_isas() {
     int ret = BASE;
-    ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX2   ) ? AVX2   : 0;
-    ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512F) ? AVX512 : 0;
+    ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX2    ) ? AVX2     : 0;
+    ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512F ) ? AVX512F  : 0;
+    ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512VL) ? AVX512VL : 0;
+    ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512CD) ? AVX512CD : 0;
+    ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512BW) ? AVX512BW : 0;
     return (ISA)ret;
 }
 
 bool should_run(const test_func& t, ISA isas_supported) {
-    return (t.isa & isas_supported)
+    return ((t.isa & isas_supported) == t.isa)
             && (!arg_focus || arg_focus.Get() == t.id);
 }
 
@@ -637,19 +643,28 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
     // report
     table::Table table;
     table.setColColumnSeparator(" | ");
-    table.colInfo(3).justify = table::ColInfo::RIGHT;
-    table.colInfo(4).justify = table::ColInfo::RIGHT;
-    auto& header = table.newRow().add("Cores").add("ID").add("Description")
-            .add("OVRLP1").add("OVRLP2").add("OVRLP3").add("Mops");
+
+    auto& header = table.newRow();
+
+    using table::ColInfo;
+
+    auto adder = [&header, &table](const char* s, ColInfo::Justification just = ColInfo::LEFT) {
+        header.add(s);
+        table.colInfo(header.size() - 1).justify = just;
+    };
+
+    adder("Cores");
+    adder("ID");
+    adder("Description");
+    // adder("OVRLP1", ColInfo::RIGHT);
+    // adder("OVRLP2", ColInfo::RIGHT);
+    adder("OVRLP3", ColInfo::RIGHT);
+    adder("Mops", ColInfo::RIGHT);
 
     if (use_aperf) {
-        size_t col = 6;
-        header.add("A/M-ratio");
-        table.colInfo(col + 0).justify = table::ColInfo::RIGHT;
-        header.add("A/M-MHz");
-        table.colInfo(col + 1).justify = table::ColInfo::RIGHT;
-        header.add("M/tsc-ratio");
-        table.colInfo(col + 2).justify = table::ColInfo::RIGHT;
+        adder("A/M-ratio", ColInfo::RIGHT);
+        adder("A/M-MHz", ColInfo::RIGHT);
+        adder("M/tsc-ratio", ColInfo::RIGHT);
     }
 
     for (const result_holder& holder : results_list) {
@@ -658,8 +673,8 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
                                 .add(spec->count())
                                 .add(spec->name)
                                 .add(spec->description)
-                                .addf("%5.3f", holder.get_overlap1())
-                                .addf("%5.3f", holder.get_overlap2())
+                                // .addf("%5.3f", holder.get_overlap1())
+                                // .addf("%5.3f", holder.get_overlap2())
                                 .addf("%5.3f", holder.get_overlap3());
 
         auto& results = holder.results;
@@ -754,14 +769,17 @@ int main(int argc, char** argv) {
     verbose = arg_verbose;
     bool is_root = (geteuid() == 0);
     bool use_aperf = aperf_ghz::is_supported();
-    printf("CPUID highest leaf  : [%2xh]\n", cpuid_highest_leaf());
-    printf("Running as root     : [%s]\n", is_root     ? "YES" : "NO ");
-    printf("MSR reads supported : [%s]\n", use_aperf   ? "YES" : "NO ");
-    printf("CPU pinning enabled : [%s]\n", !arg_no_pin ? "YES" : "NO ");
+    printf("CPUID highest leaf    : [%2xh]\n", cpuid_highest_leaf());
+    printf("Running as root       : [%s]\n", is_root     ? "YES" : "NO ");
+    printf("MSR reads supported   : [%s]\n", use_aperf   ? "YES" : "NO ");
+    printf("CPU pinning enabled   : [%s]\n", !arg_no_pin ? "YES" : "NO ");
 
     ISA isas_supported = get_isas();
-    printf("CPU supports AVX2   : [%s]\n", isas_supported & AVX2   ? "YES" : "NO ");
-    printf("CPU supports AVX-512: [%s]\n", isas_supported & AVX512 ? "YES" : "NO ");
+    printf("CPU supports AVX2     : [%s]\n", isas_supported & AVX2     ? "YES" : "NO ");
+    printf("CPU supports AVX-512F : [%s]\n", isas_supported & AVX512F  ? "YES" : "NO ");
+    printf("CPU supports AVX-512VL: [%s]\n", isas_supported & AVX512VL ? "YES" : "NO ");
+    printf("CPU supports AVX-512BW: [%s]\n", isas_supported & AVX512BW ? "YES" : "NO ");
+    printf("CPU supports AVX-512CD: [%s]\n", isas_supported & AVX512CD ? "YES" : "NO ");
     printf("tsc_freq = %.1f MHz (%s)\n", RdtscClock::tsc_freq() / 1000000.0, get_tsc_cal_info(arg_force_tsc_cal));
     std::vector<int> cpus = get_cpus();
     printf("CPU brand string: %s\n", get_brand_string().c_str());
@@ -771,7 +789,7 @@ int main(int argc, char** argv) {
         printf("%lu physical cores: [%s]\n", cpus.size(), join(cpus, ", ").c_str());
     }
 
-    if (arg_dirty && !(isas_supported & AVX512)) {
+    if (arg_dirty && !(isas_supported & AVX512VL)) {
         printf("ERROR: --dirty-upper only supported on AVX-512 hardware\n");
         exit(EXIT_FAILURE);
     }

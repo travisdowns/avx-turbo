@@ -160,9 +160,9 @@ ret
 test_func_sparse avx128_mov_sparse,       {vbroadcastsd ymm0, [one_dp]}, {vmovdqa xmm0, xmm0}, {}
 test_func_sparse avx256_mov_sparse,       {vbroadcastsd ymm0, [one_dp]}, {vmovdqa ymm0, ymm0}, {}
 test_func_sparse avx512_mov_sparse,       {vbroadcastsd zmm0, [one_dp]}, {vmovdqa32 zmm0, zmm0}, {}
-test_func_sparse avx128_merge_sparse, {vbroadcastsd ymm0, [one_dp]}, {vmovdqa32 xmm0{k1}, xmm0}, {kmovq k1, [kmask]}
-test_func_sparse avx256_merge_sparse, {vbroadcastsd ymm0, [one_dp]}, {vmovdqa32 ymm0{k1}, ymm0}, {kmovq k1, [kmask]}
-test_func_sparse avx512_merge_sparse, {vbroadcastsd zmm0, [one_dp]}, {vmovdqa32 zmm0{k1}, zmm0}, {kmovq k1, [kmask]}
+test_func_sparse avx128_merge_sparse, {vbroadcastsd ymm0, [one_dp]}, {vmovdqa32 xmm0{k1}, xmm0}, {kmovw k1, [kmask]}
+test_func_sparse avx256_merge_sparse, {vbroadcastsd ymm0, [one_dp]}, {vmovdqa32 ymm0{k1}, ymm0}, {kmovw k1, [kmask]}
+test_func_sparse avx512_merge_sparse, {vbroadcastsd zmm0, [one_dp]}, {vmovdqa32 zmm0{k1}, zmm0}, {kmovw k1, [kmask]}
 
 test_func_sparse avx128_fma_sparse, {vbroadcastsd ymm0, [zero_dp]}, {vfmadd132pd xmm0, xmm0, xmm0 }, {}
 test_func_sparse avx256_fma_sparse, {vbroadcastsd ymm0, [zero_dp]}, {vfmadd132pd ymm0, ymm0, ymm0 }, {}
