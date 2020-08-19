@@ -70,11 +70,11 @@ struct test_func {
     x(scalar_iadd         , "Scalar integer adds"            , BASE)     \
     x(avx128_iadd         , "128-bit integer serial adds"    , AVX2  )   \
     x(avx256_iadd         , "256-bit integer serial adds"    , AVX2  )   \
-    x(avx512_iadd         , "512-bit integer series adds"    , AVX512F)  \
+    x(avx512_iadd         , "512-bit integer serial adds"    , AVX512F)  \
                                                                          \
     x(avx128_iadd16     , "128-bit integer serial adds zmm16", AVX512VL) \
     x(avx256_iadd16     , "256-bit integer serial adds zmm16", AVX512VL) \
-    x(avx512_iadd16     , "512-bit integer series adds zmm16", AVX512F)  \
+    x(avx512_iadd16     , "512-bit integer serial adds zmm16", AVX512F)  \
                                                                          \
     /* iadd throughput */                                                \
     x(avx128_iadd_t       , "128-bit integer parallel adds"  , AVX2  )   \
@@ -424,8 +424,7 @@ ISA get_isas() {
 }
 
 bool should_run(const test_func& t, ISA isas_supported) {
-    return ((t.isa & isas_supported) == t.isa)
-            && (!arg_focus || arg_focus.Get() == t.id);
+    return (t.isa & isas_supported) == t.isa;
 }
 
 /*
@@ -452,6 +451,17 @@ struct test_spec {
     }
 };
 
+
+/* find the test that exactly matches the given ID or return nullptr if not found */
+const test_func *find_one_test(const std::string& id) {
+    for (const auto& t : ALL_FUNCS) {
+        if (id == t.id) {
+            return &t;
+        }
+    }
+    return nullptr;
+}
+
 /**
  * If the user didn't specify any particular test spec, just create for every thread count
  * value T and runnable func, a spec with T copies of func.
@@ -475,12 +485,30 @@ std::vector<test_spec> make_default_tests(ISA isas_supported, std::vector<int> c
 
     printf("Will test up to %lu CPUs\n", maxcpus);
 
+    auto try_add = [&ret](const test_func& t, size_t thread_count) {
+        test_spec spec(t.id, t.description);
+        spec.thread_funcs.resize(thread_count, t); // fill with thread_count copies of t
+        ret.push_back(std::move(spec));
+    };
+
+    std::vector<test_func> funcs; // the selected test functions
+    if (arg_focus) {
+        for (auto& focus : split(arg_focus.Get(), ",")) {
+            auto t = find_one_test(focus);
+            if (!t) {
+                printf("WARNING: Can't find specified test: %s\n", focus.c_str());
+            } else {
+                funcs.push_back(*t);
+            }
+        }
+    } else {
+        funcs.insert(funcs.begin(), std::begin(ALL_FUNCS), std::end(ALL_FUNCS));
+    }
+
     for (size_t thread_count = arg_min_threads.Get(); thread_count <= maxcpus; thread_count++) {
-        for (const auto& t : ALL_FUNCS) {
+        for (const auto& t : funcs) {
             if (should_run(t, isas_supported)) {
-                test_spec spec(t.id, t.description);
-                spec.thread_funcs.resize(thread_count, t); // fill with thread_count copies of t
-                ret.push_back(std::move(spec));
+                try_add(t, thread_count);
             }
         }
     }
@@ -488,15 +516,6 @@ std::vector<test_spec> make_default_tests(ISA isas_supported, std::vector<int> c
     return ret;
 }
 
-/* find the test that exactly matches the given ID or return nullptr if not found */
-const test_func *find_one_test(const std::string id) {
-    for (const auto& t : ALL_FUNCS) {
-        if (id == t.id) {
-            return &t;
-        }
-    }
-    return nullptr;
-}
 
 std::vector<test_spec> make_from_spec(ISA, std::vector<int> cpus) {
     std::string str = arg_spec.Get();
