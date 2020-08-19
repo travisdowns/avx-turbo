@@ -29,7 +29,9 @@ for the 1-latency tests).
 
 ## spec-based tests
 
-The default behavior for ./avx-turbo is to run tests with various thread counts, but with the same test on each thread. For example,
+The default behavior for ./avx-turbo is to run tests with various thread counts, but with the same test on each thread. For example, the `avx256_fma` test means that the same FMA-using test code will be run on _each_ test thread.
+
+An alternate approach is availe with so-called _spec-based_ tests. This lets you specificy exactly what each thread in a test will run. The general form of a specification is: `test1/thead-count1[,test2/thread-count2[,...]]`. For example,
 if you run `sudo ./avx-turbo --spec avx256_fma/1,scalar_iadd/3` you'll get one copy of `avx256_fma` and three copies of `scalar_iadd` running in parallel.
 
 This mode is useful to testing that happens when not all cores are doing the same thing.
