@@ -64,10 +64,14 @@ test_func avx128_iadd16,  {vpternlogd xmm16, xmm16, xmm16, 0xff}, {vpaddq  xmm16
 test_func avx256_iadd16,  {vpternlogd ymm16, ymm16, ymm16, 0xff}, {vpaddq  ymm16, ymm16, ymm16}
 test_func avx512_iadd16,  {vpternlogd zmm16, zmm16, zmm16, 0xff}, {vpaddq  zmm16, zmm16, zmm16}
 
-
 ; iadd throughput
 test_func avx128_iadd_t,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpaddq  xmm0, xmm1, xmm1}
 test_func avx256_iadd_t,  {vpcmpeqd ymm1, ymm0, ymm0}, {vpaddq  ymm0, ymm1, ymm1}
+
+; zeroing xor
+test_func avx128_xor_zero, {}, {vpxor  xmm0, xmm0, xmm0}
+test_func avx256_xor_zero, {}, {vpxor  ymm0, ymm0, ymm0}
+test_func avx512_xor_zero, {}, {vpxord zmm0, zmm0, zmm0}
 
 ; vpsrlvd latency
 test_func avx128_vshift,  {vpcmpeqd xmm1, xmm0, xmm0}, {vpsrlvd  xmm0, xmm0, xmm0}

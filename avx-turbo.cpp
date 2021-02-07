@@ -80,6 +80,11 @@ struct test_func {
     x(avx128_iadd_t       , "128-bit integer parallel adds"  , AVX2  )   \
     x(avx256_iadd_t       , "256-bit integer parallel adds"  , AVX2  )   \
                                                                          \
+    /* zeroing xor */                                                    \
+    x(avx128_xor_zero     , "128-bit zeroing xor"            , AVX2  )   \
+    x(avx256_xor_zero     , "256-bit zeroing xor"            , AVX2  )   \
+    x(avx512_xor_zero     , "512-bit zeroing xord"           , AVX512F)  \
+                                                                         \
     /* reg-reg mov */                                                    \
     x(avx128_mov_sparse   , "128-bit reg-reg mov"            , AVX2)     \
     x(avx256_mov_sparse   , "256-bit reg-reg mov"            , AVX2  )   \
