@@ -1,12 +1,11 @@
-[![Build Status](https://travis-ci.org/travisdowns/avx-turbo.svg?branch=master)](https://travis-ci.org/travisdowns/avx-turbo)
-
 # avx-turbo
 
 Test the non-AVX, AVX2 and AVX-512 speeds for various types of CPU intensive loops, across various active core counts. Currently it is **Linux only**, but the basic testing mechanism could be ported to OSX and Windows as well (help welcome). 
 
 # CI Status
 
-**Build:** ![Master Branch](https://github.com/travisdowns/avx-turbo/workflows/build/badge.svg)
+**Build:** [![Master Branch](https://github.com/travisdowns/avx-turbo/workflows/build/badge.svg)](https://github.com/travisdowns/avx-turbo/actions?query=workflow%3Abuild+branch%3Amaster)
+
 
 # build
 
