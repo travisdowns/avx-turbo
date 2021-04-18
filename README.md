@@ -1,6 +1,8 @@
 # avx-turbo
 
-Test the non-AVX, AVX2 and AVX-512 speeds for various types of CPU intensive loops, across various active core counts. Currently it is **Linux only**, but the basic testing mechanism could be ported to OSX and Windows as well (help welcome). 
+Test the non-AVX, AVX2 and AVX-512 speeds for various types of CPU intensive loops with varying scalar and SIMD instructions, across different active core counts.
+
+Currently it is **Linux only** (it does run on WSL and WSL2 on Windows), but the basic testing mechanism could be ported to OSX and Windows as well (help welcome). 
 
 # CI Status
 
