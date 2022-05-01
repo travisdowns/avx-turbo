@@ -11,6 +11,7 @@
 #include "table.hpp"
 #include "util.hpp"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <deque>
@@ -187,6 +188,7 @@ args::ValueFlag<std::string> arg_spec{parser, "SPEC", "Run a specific type of te
 args::ValueFlag<size_t> arg_iters{parser, "ITERS", "Run the test loop ITERS times (default 100000)", {"iters"}, 100000};
 args::ValueFlag<int> arg_min_threads{parser, "MIN", "The minimum number of threads to use", {"min-threads"}, 1};
 args::ValueFlag<int> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
+args::ValueFlag<int> arg_num_cpus{parser, "CPUS", "Override number of available CPUs", {"num-cpus"}};
 args::ValueFlag<uint64_t> arg_warm_ms{parser, "MILLISECONDS", "Warmup milliseconds for each thread after pinning (default 100)", {"warmup-ms"}, 100};
 
 
@@ -729,6 +731,14 @@ void list_tests() {
 }
 
 std::vector<int> get_cpus() {
+    if (arg_num_cpus) {
+        auto cpu_num = arg_num_cpus.Get();
+        std::vector<int> ret;
+        for (int cpu = 0; cpu < cpu_num; ++cpu) {
+            ret.push_back(cpu);
+        }
+        return ret;
+    }
     cpu_set_t cpu_set;
     if (sched_getaffinity(0, sizeof(cpu_set), &cpu_set)) {
         err(EXIT_FAILURE, "failed while getting cpu affinity");
