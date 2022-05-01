@@ -11,7 +11,6 @@
 #include "table.hpp"
 #include "util.hpp"
 
-#include <algorithm>
 #include <array>
 #include <atomic>
 #include <deque>
