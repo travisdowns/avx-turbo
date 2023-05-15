@@ -7,6 +7,8 @@ include config.mk
 
 ASM_FLAGS ?= -DNASM_ENABLE_DEBUG=$(NASM_DEBUG) -w+all -l x86_methods.list
 
+CPU_ARCH := native
+
 ifneq ($(CPU_ARCH),)
 ARCH_FLAGS := -march=$(CPU_ARCH)
 endif

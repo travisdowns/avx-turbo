@@ -27,11 +27,12 @@
 
 #include <error.h>
 #include <err.h>
+#include <immintrin.h>
 #include <sched.h>
 #include <sys/types.h>
+#include <sys/syscall.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
-
 
 #define MSR_IA32_MPERF 0x000000e7
 #define MSR_IA32_APERF 0x000000e8
@@ -50,6 +51,8 @@ enum ISA {
     AVX512VL = 1 << 3, // note: does not imply F, although i don't know any CPU with VL but not F
     AVX512CD = 1 << 4,
     AVX512BW = 1 << 5,
+    AMXINT8  = 1 << 6,
+    AMXTILE  = 1 << 6,
 };
 
 struct test_func {
@@ -132,6 +135,8 @@ struct test_func {
     x(avx512_vpermw_t     , "512-bit parallel WORD permute"  , AVX512BW) \
     x(avx512_vpermd       , "512-bit serial DWORD permute"   , AVX512F) \
     x(avx512_vpermd_t     , "512-bit parallel DWORD permute" , AVX512F) \
+                                                                        \
+    x(amx_int8            , "AMX 8-bit integer"              , AMXINT8)     \
 
 
 #define DECLARE(f,...) cal_f f;
@@ -425,6 +430,7 @@ ISA get_isas() {
     ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512VL) ? AVX512VL : 0;
     ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512CD) ? AVX512CD : 0;
     ret |= psnip_cpu_feature_check(PSNIP_CPU_FEATURE_X86_AVX512BW) ? AVX512BW : 0;
+    ret |= AMXINT8;
     return (ISA)ret;
 }
 
@@ -611,6 +617,56 @@ struct warmup {
     }
 };
 
+//Define tile config data structure 
+typedef struct __tile_config
+{
+  uint8_t palette_id;
+  uint8_t start_row;
+  uint8_t reserved_0[14];
+  uint16_t colsb[16]; 
+  uint8_t rows[16]; 
+} __tilecfg;
+
+static void init_tile_config (__tilecfg *tileinfo)
+{
+  static constexpr int MAX_ROWS = 16;
+  static constexpr int MAX_COLS = 64;
+  int i;
+  tileinfo->palette_id = 1;
+  tileinfo->start_row = 0;
+
+  for (i = 0; i < 1; ++i)
+  {
+    tileinfo->colsb[i] = MAX_ROWS;
+    tileinfo->rows[i] =  MAX_ROWS;
+  }
+
+  for (i = 1; i < 4; ++i)
+  {
+    tileinfo->colsb[i] = MAX_COLS;
+    tileinfo->rows[i] =  MAX_ROWS;
+  }
+
+  _tile_loadconfig (tileinfo);
+}
+
+/* Set_tiledata_use() - Invoke syscall to set ARCH_SET_STATE_USE */
+static bool set_tiledata_use()
+{
+   if (syscall(SYS_arch_prctl, /* ARCH_REQ_XCOMP_PERM */ 0x1023, /* XFEATURE_XTILEDATA*/ 18)) 
+   {
+      printf("\n Fail to do XFEATURE_XTILEDATA \n\n");
+      return false;
+   }
+   else
+   {
+      printf("\n TILE DATA USE SET - OK \n\n");
+      return true;
+   }
+
+   return true;
+}
+
 struct test_thread {
     size_t id;
     hot_barrier* start_barrier;
@@ -638,10 +694,14 @@ struct test_thread {
     void operator=(const test_thread&) = delete;
 
     void operator()() {
-        // if (verbose) printf("Running test in thread %lu, this = %p\n", id, this);
+        if (verbose) printf("Running test in thread %lu, this = %p\n", id, this);
         if (!arg_no_pin) {
             pin_to_cpu(id);
         }
+        __tilecfg tile_data = {0};
+        // Load tile configuration 
+        init_tile_config (&tile_data);
+
         aperf_ghz aperf_timer;
         outer_timer& outer = use_aperf ? static_cast<outer_timer&>(aperf_timer) : dummy_outer::dummy;
         warmup w{arg_warm_ms.Get()};
@@ -656,6 +716,10 @@ struct test_thread {
         res.end_ts = RdtscClock::now();
         res.aperf_am   = use_aperf ? aperf_timer.am_ratio() : 0.0;
         res.aperf_mt   = use_aperf ? aperf_timer.mt_ratio() : 0.0;
+
+        // Release the tile configuration to return to the init state, 
+        // which releases all storage it currently holds
+        _tile_release ();
     }
 };
 
@@ -825,6 +889,10 @@ int main(int argc, char** argv) {
         printf("ERROR: --dirty-upper only supported on AVX-512 hardware\n");
         exit(EXIT_FAILURE);
     }
+
+    // Request permission to linux kernel to run AMX 
+    if (!set_tiledata_use())
+        exit(-1);
 
     auto iters = arg_iters.Get();
     zeroupper();

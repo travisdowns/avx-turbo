@@ -98,6 +98,9 @@ test_func avx128_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd xmm0, xmm0, 
 test_func avx256_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd ymm0, ymm0, ymm0}
 test_func avx512_fma ,    {vpxor    xmm0, xmm0, xmm0}, {vfmadd132pd zmm0, zmm0, zmm0}
 
+; AMX
+test_func amx_int8,       {}, {tdpbssd tmm3, tmm1, tmm2}
+
 ; this is like test_func, but it uses 10 parallel chains of instructions,
 ; unrolled 10 times, so (probably) max throughput at least if latency * throughput
 ; product for the instruction <= 10
