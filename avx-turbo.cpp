@@ -708,9 +708,9 @@ void report_results(const std::vector<result_holder>& results_list, bool use_ape
                                 .addf("%5.3f", holder.get_overlap3());
 
         auto& results = holder.results;
-        row.add(result_string(results, "%4.0f", [](const result& r){ return r.inner.mops * 1000; }));
+        row.add(result_string(results, "%5.0f", [](const result& r){ return r.inner.mops * 1000; }));
         if (use_aperf) {
-            row.add(result_string(results, "%5.2f", [](const result& r){ return r.aperf_am; }));
+            row.add(result_string(results, "%4.2f", [](const result& r){ return r.aperf_am; }));
             row.add(result_string(results, "%.0f",  [](const result& r){ return r.aperf_am / 1000000.0 * RdtscClock::tsc_freq(); }));
             row.add(result_string(results, "%4.2f", [](const result& r){ return r.aperf_mt; }));
         }
