@@ -18,3 +18,16 @@ jobs:
       - run: make -j2
       - run: ./unit-test
       - run: ./avx-turbo --no-pin --max-threads 2
+
+  asan:
+    # gated as the build job above is
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: make ASAN=1
+      # avx-turbo itself is not leak-clean, and the unit tests are what
+      # exercise the code paths sanitizers have something to say about
+      - run: ./unit-test
