@@ -1,7 +1,7 @@
 BITS 64
 default rel
 
-%if (__NASM_MAJOR__ < 2) || (__NASM_MINOR__ < 11)
+%if (__NASM_MAJOR__ < 2) && (__NASM_MINOR__ < 11)
 %deftok ver __NASM_VER__
 %error Your nasm version (ver) is too old, you need at least 2.11 to compile this
 %endif
