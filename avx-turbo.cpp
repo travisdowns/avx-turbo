@@ -279,8 +279,8 @@ struct aperf_ghz : outer_timer {
      */
     static bool is_supported() {
         uint64_t dummy;
-        return     read_msr_cur_cpu(MSR_IA32_MPERF, &dummy) == 0
-                && read_msr_cur_cpu(MSR_IA32_APERF, &dummy) == 0;
+        return     read_msr(1, MSR_IA32_MPERF, &dummy) == 0
+                && read_msr(1, MSR_IA32_APERF, &dummy) == 0;
     }
 
     virtual void start() override {
