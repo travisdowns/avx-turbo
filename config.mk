@@ -7,6 +7,13 @@ DEBUG ?= 0
 # debug info handling.
 ASM ?= ./nasm-2.13.03/nasm
 
+# set ASAN to 1 to build with AddressSanitizer
+ASAN ?= 0
+
+ifeq ($(ASAN),1)
+SANITIZE_FLAGS := -fsanitize=address -fno-omit-frame-pointer
+endif
+
 ifeq ($(DEBUG),1)
 O_LEVEL ?= -O0
 NASM_DEBUG ?= 1
