@@ -1,7 +1,12 @@
 name: build
-on: [push]
+on: [push, pull_request]
 jobs:
   build:
+    # Pushes cover branches in this repo; fork PRs never fire our push
+    # trigger, so they are the only pull_request events worth building.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
