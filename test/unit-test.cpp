@@ -9,6 +9,7 @@
 
 #include "../util.hpp"
 #include "../cpuid.hpp"
+#include "../msr-access.h"
 
 #include <array>
 #include <utility>
@@ -134,8 +135,15 @@ TEST_CASE( "get_bits" ) {
     REQUIRE(get_bits(0xFFFFFFFF,0,30) == 0x7FFFFFFF);
 }
 
-
-
-
-
-
+TEST_CASE( "msr cpu file array growth" ) {
+    // read_msr keeps a per-cpu array of cached file descriptors which grows on
+    // demand. Indices well past its initial size must stay in bounds; the msr
+    // files for these cpus generally do not exist, and the reads are expected
+    // to fail, but the bookkeeping still has to be correct. Run this under
+    // AddressSanitizer to get anything out of it.
+    uint64_t value;
+    for (int cpu : {0, 31, 32, 63, 64, 65, 129, 1000, 4096}) {
+        // repeated so a cpu that is already cached is exercised too
+        REQUIRE( read_msr(cpu, 0xe7, &value) == read_msr(cpu, 0xe7, &value) );
+    }
+}
