@@ -57,7 +57,7 @@ int get_rfile(int cpu) {
 
     if (cpu >= rfile_size) {
         // expand array
-        size_t new_size = rfile_size * 2 > cpu ? rfile_size * 2 : cpu;
+        size_t new_size = rfile_size * 2 > cpu ? rfile_size * 2 : cpu + 1;
         int *new_array = calloc(new_size, sizeof(int));
         memcpy(new_array, rfile_array, rfile_size  * sizeof(int));
         if (rfile_array != rfile_static) {
